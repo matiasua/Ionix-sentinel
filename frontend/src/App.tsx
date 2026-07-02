@@ -14,11 +14,14 @@ const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
 const SOURCES: Source[] = ["code", "log"];
 
 const EMPTY_FORM = {
-  title: "",
-  description: "",
-  severity: "medium" as Severity,
+  ruleId: "",
   pciRequirement: "",
+  title: "",
+  severity: "medium" as Severity,
   source: "code" as Source,
+  filePath: "",
+  lineNumber: "",
+  snippet: "",
 };
 
 export default function App() {
@@ -55,14 +58,17 @@ export default function App() {
     event.preventDefault();
     setError(null);
 
-    if (!form.title || !form.description || !form.pciRequirement) {
+    if (!form.ruleId || !form.pciRequirement || !form.title || !form.filePath || !form.snippet) {
       setError("Completa todos los campos.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await createFinding(form);
+      await createFinding({
+        ...form,
+        lineNumber: form.lineNumber ? Number(form.lineNumber) : null,
+      });
       setForm(EMPTY_FORM);
       await loadFindings();
     } catch {
@@ -89,15 +95,19 @@ export default function App() {
         <h2>Nuevo finding</h2>
         <form className="finding-form" onSubmit={handleSubmit}>
           <input
+            placeholder="Rule ID (ej: SENTINEL-PAN-001)"
+            value={form.ruleId}
+            onChange={(e) => setForm({ ...form, ruleId: e.target.value })}
+          />
+          <input
+            placeholder="Requisito PCI-DSS (ej: 6.5.1)"
+            value={form.pciRequirement}
+            onChange={(e) => setForm({ ...form, pciRequirement: e.target.value })}
+          />
+          <input
             placeholder="Título"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
-          <textarea
-            placeholder="Descripción"
-            rows={3}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
           <select
             value={form.severity}
@@ -111,11 +121,6 @@ export default function App() {
               </option>
             ))}
           </select>
-          <input
-            placeholder="Requisito PCI-DSS (ej: 6.5.1)"
-            value={form.pciRequirement}
-            onChange={(e) => setForm({ ...form, pciRequirement: e.target.value })}
-          />
           <select
             value={form.source}
             onChange={(e) => setForm({ ...form, source: e.target.value as Source })}
@@ -126,6 +131,23 @@ export default function App() {
               </option>
             ))}
           </select>
+          <input
+            placeholder="Archivo (ej: src/services/payment.ts)"
+            value={form.filePath}
+            onChange={(e) => setForm({ ...form, filePath: e.target.value })}
+          />
+          <input
+            placeholder="Línea"
+            type="number"
+            value={form.lineNumber}
+            onChange={(e) => setForm({ ...form, lineNumber: e.target.value })}
+          />
+          <textarea
+            placeholder="Snippet"
+            rows={3}
+            value={form.snippet}
+            onChange={(e) => setForm({ ...form, snippet: e.target.value })}
+          />
           <button type="submit" disabled={submitting}>
             {submitting ? "Creando..." : "Crear finding"}
           </button>
@@ -145,10 +167,13 @@ export default function App() {
                   {finding.severity}
                 </span>
               </div>
-              <p>{finding.description}</p>
+              <p>
+                {finding.filePath}
+                {finding.lineNumber ? `:${finding.lineNumber}` : ""}
+              </p>
               <div className="finding-card__meta">
-                PCI: {finding.pciRequirement} · Fuente: {finding.source} ·{" "}
-                {new Date(finding.createdAt).toLocaleString()}
+                PCI: {finding.pciRequirement} · Regla: {finding.ruleId} · Fuente:{" "}
+                {finding.source} · {new Date(finding.createdAt).toLocaleString()}
               </div>
             </li>
           ))}

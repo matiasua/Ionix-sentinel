@@ -5,17 +5,16 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS findings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
-  description TEXT NOT NULL,
   severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   pci_requirement TEXT NOT NULL,
   source TEXT NOT NULL CHECK (source IN ('code', 'log')),
 
   -- Campos del motor de reglas / analizador (rule_id apunta a un id en
   -- rules/pci-rules.yaml, NO a una tabla — las reglas viven en YAML).
-  rule_id TEXT,
-  file_path TEXT,
+  rule_id TEXT NOT NULL,
+  file_path TEXT NOT NULL,
   line_number INTEGER,
-  snippet TEXT,
+  snippet TEXT NOT NULL,
 
   -- Campos generados por el motor de razonamiento (Claude).
   explanation TEXT,

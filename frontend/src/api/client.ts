@@ -2,23 +2,34 @@ export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 export type Severity = "low" | "medium" | "high" | "critical";
 export type Source = "code" | "log";
+export type Status = "open" | "acknowledged" | "resolved" | "false_positive";
 
 export interface Finding {
   id: string;
-  title: string;
-  description: string;
-  severity: Severity;
+  ruleId: string;
   pciRequirement: string;
+  title: string;
+  severity: Severity;
   source: Source;
+  filePath: string;
+  lineNumber: number | null;
+  snippet: string;
+  explanation: string;
+  remediation: string;
+  status: Status;
+  scanId: string | null;
   createdAt: string;
 }
 
 export interface CreateFindingInput {
-  title: string;
-  description: string;
-  severity: Severity;
+  ruleId: string;
   pciRequirement: string;
+  title: string;
+  severity: Severity;
   source: Source;
+  filePath: string;
+  lineNumber: number | null;
+  snippet: string;
 }
 
 export async function getHealth(): Promise<{ status: string; service: string }> {
