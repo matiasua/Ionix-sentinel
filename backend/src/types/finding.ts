@@ -37,3 +37,14 @@ export interface CreateFindingInput {
   status?: Status;
   scanId?: string | null;
 }
+
+export interface UpdateFindingInput {
+  status: Status;
+}
+
+export interface FindingFilters {
+  severity?: Severity;
+  source?: Source;
+  status?: Status;
+  scanId?: string;
+}

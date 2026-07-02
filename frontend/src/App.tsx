@@ -1,184 +1,77 @@
 import { useEffect, useState } from "react";
-import {
-  Finding,
-  Severity,
-  Source,
-  createFinding,
-  getFindings,
-  getHealth,
-} from "./api/client";
+import { getHealth } from "./api/client";
+import DashboardPage from "./pages/DashboardPage";
+import FindingsListPage from "./pages/FindingsListPage";
+import FindingDetailPage from "./pages/FindingDetailPage";
 
 type BackendStatus = "loading" | "ok" | "error";
-
-const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
-const SOURCES: Source[] = ["code", "log"];
-
-const EMPTY_FORM = {
-  ruleId: "",
-  pciRequirement: "",
-  title: "",
-  severity: "medium" as Severity,
-  source: "code" as Source,
-  filePath: "",
-  lineNumber: "",
-  snippet: "",
-};
+type View = "dashboard" | "findings";
 
 export default function App() {
   const [backendStatus, setBackendStatus] = useState<BackendStatus>("loading");
-  const [findings, setFindings] = useState<Finding[]>([]);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadHealth() {
-    try {
-      await getHealth();
-      setBackendStatus("ok");
-    } catch {
-      setBackendStatus("error");
-    }
-  }
-
-  async function loadFindings() {
-    try {
-      const data = await getFindings();
-      setFindings(data);
-    } catch {
-      setError("No se pudieron cargar los findings.");
-    }
-  }
+  const [view, setView] = useState<View>("dashboard");
+  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadHealth();
-    loadFindings();
+    getHealth()
+      .then(() => setBackendStatus("ok"))
+      .catch(() => setBackendStatus("error"));
   }, []);
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-
-    if (!form.ruleId || !form.pciRequirement || !form.title || !form.filePath || !form.snippet) {
-      setError("Completa todos los campos.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await createFinding({
-        ...form,
-        lineNumber: form.lineNumber ? Number(form.lineNumber) : null,
-      });
-      setForm(EMPTY_FORM);
-      await loadFindings();
-    } catch {
-      setError("No se pudo crear el finding.");
-    } finally {
-      setSubmitting(false);
-    }
+  function navigateTo(nextView: View) {
+    setSelectedFindingId(null);
+    setView(nextView);
   }
 
   return (
     <div className="app">
       <header className="app__header">
-        <h1>IONIX Sentinel</h1>
-        <p>Detección temprana de riesgos PCI-DSS en código y logs</p>
+        <div>
+          <h1>IONIX Sentinel</h1>
+          <p>Detección temprana de riesgos PCI-DSS en código y logs</p>
+        </div>
+        <div className={`status status--${backendStatus}`}>
+          {backendStatus === "loading" && "Consultando backend..."}
+          {backendStatus === "ok" && "Backend conectado"}
+          {backendStatus === "error" && "Backend no disponible"}
+        </div>
       </header>
 
-      <div className={`status status--${backendStatus}`}>
-        {backendStatus === "loading" && "Consultando backend..."}
-        {backendStatus === "ok" && "Backend conectado"}
-        {backendStatus === "error" && "Backend no disponible"}
-      </div>
+      <nav className="app__nav">
+        <button
+          type="button"
+          className={view === "dashboard" && !selectedFindingId ? "app__nav-item app__nav-item--active" : "app__nav-item"}
+          onClick={() => navigateTo("dashboard")}
+        >
+          Dashboard
+        </button>
+        <button
+          type="button"
+          className={view === "findings" && !selectedFindingId ? "app__nav-item app__nav-item--active" : "app__nav-item"}
+          onClick={() => navigateTo("findings")}
+        >
+          Hallazgos
+        </button>
+      </nav>
 
-      <section>
-        <h2>Nuevo finding</h2>
-        <form className="finding-form" onSubmit={handleSubmit}>
-          <input
-            placeholder="Rule ID (ej: SENTINEL-PAN-001)"
-            value={form.ruleId}
-            onChange={(e) => setForm({ ...form, ruleId: e.target.value })}
-          />
-          <input
-            placeholder="Requisito PCI-DSS (ej: 6.5.1)"
-            value={form.pciRequirement}
-            onChange={(e) => setForm({ ...form, pciRequirement: e.target.value })}
-          />
-          <input
-            placeholder="Título"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
-          <select
-            value={form.severity}
-            onChange={(e) =>
-              setForm({ ...form, severity: e.target.value as Severity })
-            }
-          >
-            {SEVERITIES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select
-            value={form.source}
-            onChange={(e) => setForm({ ...form, source: e.target.value as Source })}
-          >
-            {SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <input
-            placeholder="Archivo (ej: src/services/payment.ts)"
-            value={form.filePath}
-            onChange={(e) => setForm({ ...form, filePath: e.target.value })}
-          />
-          <input
-            placeholder="Línea"
-            type="number"
-            value={form.lineNumber}
-            onChange={(e) => setForm({ ...form, lineNumber: e.target.value })}
-          />
-          <textarea
-            placeholder="Snippet"
-            rows={3}
-            value={form.snippet}
-            onChange={(e) => setForm({ ...form, snippet: e.target.value })}
-          />
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Creando..." : "Crear finding"}
-          </button>
-        </form>
-        {error && <p style={{ color: "#fca5a5" }}>{error}</p>}
-      </section>
+      <main className="app__main">
+        {backendStatus === "error" && (
+          <p className="app__backend-warning">
+            No se pudo conectar con el backend. Verifica que esté corriendo.
+          </p>
+        )}
 
-      <section>
-        <h2>Findings registrados</h2>
-        {findings.length === 0 && <p>No hay findings todavía.</p>}
-        <ul className="findings-list">
-          {findings.map((finding) => (
-            <li key={finding.id} className="finding-card">
-              <div className="finding-card__header">
-                <strong>{finding.title}</strong>
-                <span className={`severity-badge severity-${finding.severity}`}>
-                  {finding.severity}
-                </span>
-              </div>
-              <p>
-                {finding.filePath}
-                {finding.lineNumber ? `:${finding.lineNumber}` : ""}
-              </p>
-              <div className="finding-card__meta">
-                PCI: {finding.pciRequirement} · Regla: {finding.ruleId} · Fuente:{" "}
-                {finding.source} · {new Date(finding.createdAt).toLocaleString()}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+        {selectedFindingId ? (
+          <FindingDetailPage
+            findingId={selectedFindingId}
+            onBack={() => setSelectedFindingId(null)}
+          />
+        ) : view === "dashboard" ? (
+          <DashboardPage onSelectFinding={setSelectedFindingId} />
+        ) : (
+          <FindingsListPage onSelectFinding={setSelectedFindingId} />
+        )}
+      </main>
     </div>
   );
 }
