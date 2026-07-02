@@ -1,0 +1,172 @@
+<mxfile host="app.diagrams.net" agent="claude-code" version="21.6.5" type="device">
+  <diagram name="IONIX Sentinel - ER" id="er-model-1">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="IONIX Sentinel - Modelo Entidad-Relacion" style="text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="0" width="500" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="Azul = Fase 1 (comprometido)   |   Naranja = Fase 2 (stretch, analizador de logs)" style="text;html=1;fontSize=12;fontStyle=2;align=left;verticalAlign=middle;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="700" width="600" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- pci_requirements -->
+        <mxCell id="ent_pci" value="pci_requirements" style="swimlane;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="220" height="126" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_pci_r1" value="PK   id : SERIAL" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_pci">
+          <mxGeometry x="0" y="30" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_pci_r2" value="      code : VARCHAR(10)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_pci">
+          <mxGeometry x="0" y="54" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_pci_r3" value="      title : VARCHAR(200)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_pci">
+          <mxGeometry x="0" y="78" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_pci_r4" value="      description : TEXT" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_pci">
+          <mxGeometry x="0" y="102" width="220" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- rules -->
+        <mxCell id="ent_rules" value="rules" style="swimlane;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="340" y="40" width="260" height="198" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r1" value="PK   id : SERIAL" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="30" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r2" value="      code : VARCHAR(50)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="54" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r3" value="      name : VARCHAR(200)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="78" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r4" value="      source_type : VARCHAR(20)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="102" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r5" value="      pattern : TEXT" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="126" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r6" value="      description : TEXT" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="150" width="260" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_rules_r7" value="FK   pci_requirement_id : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_rules">
+          <mxGeometry x="0" y="174" width="260" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- scans -->
+        <mxCell id="ent_scans" value="scans" style="swimlane;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="680" y="40" width="220" height="174" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_scans_r1" value="PK   id : SERIAL" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_scans">
+          <mxGeometry x="0" y="30" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_scans_r2" value="      target : VARCHAR(255)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_scans">
+          <mxGeometry x="0" y="54" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_scans_r3" value="      type : VARCHAR(20)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_scans">
+          <mxGeometry x="0" y="78" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_scans_r4" value="      status : VARCHAR(20)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_scans">
+          <mxGeometry x="0" y="102" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_scans_r5" value="      started_at : TIMESTAMP" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_scans">
+          <mxGeometry x="0" y="126" width="220" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_scans_r6" value="      completed_at : TIMESTAMP" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_scans">
+          <mxGeometry x="0" y="150" width="220" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- findings -->
+        <mxCell id="ent_findings" value="findings" style="swimlane;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="340" y="300" width="300" height="366" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r1" value="PK   id : SERIAL" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="30" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r2" value="FK   scan_id : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="54" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r3" value="FK   rule_id : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="78" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r4" value="      origin : VARCHAR(20)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="102" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r5" value="      source_reference : VARCHAR(255)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="126" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r6" value="      line_number : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="150" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r7" value="      snippet : TEXT" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="174" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r8" value="      raw_data : JSONB" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="198" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r9" value="      severity : VARCHAR(20)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="222" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r10" value="      explanation : TEXT" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="246" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r11" value="      remediation : TEXT" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="270" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r12" value="      status : VARCHAR(20)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="294" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r13" value="      created_at : TIMESTAMP" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="318" width="300" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_findings_r14" value="      enriched_at : TIMESTAMP" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_findings">
+          <mxGeometry x="0" y="342" width="300" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- log_correlations (Fase 2 stretch) -->
+        <mxCell id="ent_logcorr" value="log_correlations" style="swimlane;html=1;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=14;align=center;verticalAlign=middle;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="740" y="300" width="280" height="174" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_logcorr_r1" value="PK   id : SERIAL" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_logcorr">
+          <mxGeometry x="0" y="30" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_logcorr_r2" value="FK   log_finding_id : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_logcorr">
+          <mxGeometry x="0" y="54" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_logcorr_r3" value="FK   code_finding_id : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_logcorr">
+          <mxGeometry x="0" y="78" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_logcorr_r4" value="      code_file : VARCHAR(255)" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_logcorr">
+          <mxGeometry x="0" y="102" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_logcorr_r5" value="      matched_line : INTEGER" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_logcorr">
+          <mxGeometry x="0" y="126" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="ent_logcorr_r6" value="      created_at : TIMESTAMP" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;fontSize=12;" vertex="1" parent="ent_logcorr">
+          <mxGeometry x="0" y="150" width="280" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- relationships -->
+        <mxCell id="rel1" value="1:N" style="edgeStyle=entityRelationEdgeStyle;html=1;endArrow=none;startArrow=none;rounded=0;fontSize=11;" edge="1" parent="1" source="ent_pci" target="ent_rules">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel2" value="1:N" style="edgeStyle=entityRelationEdgeStyle;html=1;endArrow=none;startArrow=none;rounded=0;fontSize=11;" edge="1" parent="1" source="ent_rules" target="ent_findings">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel3" value="1:N" style="edgeStyle=entityRelationEdgeStyle;html=1;endArrow=none;startArrow=none;rounded=0;fontSize=11;" edge="1" parent="1" source="ent_scans" target="ent_findings">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel4" value="1:N (log_finding_id)" style="edgeStyle=entityRelationEdgeStyle;html=1;endArrow=none;startArrow=none;rounded=0;fontSize=11;strokeColor=#d79b00;" edge="1" parent="1" source="ent_findings" target="ent_logcorr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel5" value="1:N (code_finding_id)" style="edgeStyle=entityRelationEdgeStyle;html=1;endArrow=none;startArrow=none;rounded=0;fontSize=11;dashed=1;strokeColor=#d79b00;" edge="1" parent="1" source="ent_findings" target="ent_logcorr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
