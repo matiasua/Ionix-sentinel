@@ -1,4 +1,6 @@
-# Modelo Entidad-Relación — IONIX Sentinel
+# Modelo Entidad-Relación — IONIX Sentinel (diseño alternativo, no implementado)
+
+> **⚠️ Superado por el esquema real.** El equipo decidió un diseño más simple: una única tabla `findings`, con las reglas viviendo en YAML (no en una tabla `rules`) y sin tabla `scans` propia. Ver el esquema efectivamente implementado en [`04-database.docs.md`](./04-database.docs.md) y [`07-backend-spec.docs.md`](./07-backend-spec.docs.md) §6. Este documento y su diagrama quedan como referencia de un diseño normalizado que se evaluó pero no se construyó — no lo uses para generar scripts SQL nuevos.
 
 Diagrama editable: [modelo-entidad-relacion.drawio](modelo-entidad-relacion.drawio) — ábrelo en [draw.io](https://app.diagrams.net) (Archivo → Abrir) o con la extensión de draw.io en VS Code.
 

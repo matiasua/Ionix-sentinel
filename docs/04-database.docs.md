@@ -4,9 +4,9 @@
 
 `ionix_sentinel` (definida por `POSTGRES_DB` en `.env`).
 
-## Tabla inicial: `findings`
+## Tabla: `findings`
 
-Definida en `backend/src/db/init.sql`:
+Esquema único para hallazgos de código y (Fase 2) de logs — sin tablas separadas para reglas, requisitos PCI-DSS o corridas de análisis. Definida en `backend/src/db/init.sql`:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -18,11 +18,33 @@ CREATE TABLE IF NOT EXISTS findings (
   severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   pci_requirement TEXT NOT NULL,
   source TEXT NOT NULL CHECK (source IN ('code', 'log')),
+
+  rule_id TEXT,
+  file_path TEXT,
+  line_number INTEGER,
+  snippet TEXT,
+
+  explanation TEXT,
+  remediation TEXT,
+  reasoning_status TEXT NOT NULL DEFAULT 'ok' CHECK (reasoning_status IN ('ok', 'error')),
+
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'resolved', 'false_positive')),
+
+  scan_id TEXT,
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_findings_scan_id ON findings (scan_id);
+CREATE INDEX IF NOT EXISTS idx_findings_status ON findings (status);
+CREATE INDEX IF NOT EXISTS idx_findings_severity ON findings (severity);
+CREATE INDEX IF NOT EXISTS idx_findings_source ON findings (source);
 ```
 
-Se usa `pgcrypto` (`gen_random_uuid()`) para generar los IDs automáticamente.
+Decisiones de diseño (ver [`07-backend-spec.docs.md`](./07-backend-spec.docs.md) §6):
+- `rule_id` referencia el id de una regla definida en `rules/pci-rules.yaml` — **no** hay tabla `rules` en la base de datos, las reglas viven en YAML.
+- `scan_id` agrupa los findings de una misma corrida de análisis — **no** hay tabla `scans` separada; el resumen (`GET /api/scans/:id`) se calcula agregando `findings` por `scan_id`.
+- Se usa `pgcrypto` (`gen_random_uuid()`) para generar los IDs automáticamente.
 
 ## Persistencia
 
@@ -73,9 +95,11 @@ docker compose up --build
 
 **Opción B — aplicar el cambio a mano sin perder datos:**
 
+Usa el script de migración aditivo en `backend/src/db/migrations/001_extend_findings.sql` (agrega `rule_id`, `file_path`, `line_number`, `snippet`, `explanation`, `remediation`, `reasoning_status`, `status`, `scan_id` e índices, todo con `IF NOT EXISTS` para poder correrlo más de una vez sin error):
+
 ```bash
-docker exec -it ionix-sentinel-postgres psql -U sentinel_user -d ionix_sentinel \
-  -c "ALTER TABLE findings ADD COLUMN status TEXT DEFAULT 'open';"
+docker exec -i ionix-sentinel-postgres psql -U sentinel_user -d ionix_sentinel \
+  < backend/src/db/migrations/001_extend_findings.sql
 ```
 
 Recomendación: si el cambio es importante para todo el equipo, también actualiza `init.sql` para que quede documentado, aunque el volumen actual no lo vuelva a ejecutar.
