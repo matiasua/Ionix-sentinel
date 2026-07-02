@@ -1,184 +1,382 @@
 import { useEffect, useState } from "react";
-import {
-  Finding,
-  Severity,
-  Source,
-  createFinding,
-  getFindings,
-  getHealth,
-} from "./api/client";
+import type { Finding, Severity, Status } from "./api/client";
+import { createFinding, getFindings } from "./api/client";
+import { Sidebar, type Section } from "./components/layout/Sidebar";
+import { Topbar } from "./components/layout/Topbar";
+import { Toast } from "./components/ui/Toast";
+import { ErrorState, LoadingState } from "./components/ui/States";
+import { DashboardResumen } from "./views/DashboardResumen";
+import { FindingsList } from "./views/FindingsList";
+import { FindingDetail } from "./views/FindingDetail";
+import { LogsSystems } from "./views/LogsSystems";
+import { LogsSystemFindings } from "./views/LogsSystemFindings";
+import { LogsComponentDetail } from "./views/LogsComponentDetail";
+import { ConfigRules } from "./views/ConfigRules";
+import { ConfigRepos } from "./views/ConfigRepos";
+import { mockFindings, snippetStart as staticSnippetStart } from "./mocks/findings";
+import { findingTraces, logFindings as logFindingsMock, logSnippetStart, logSystems } from "./mocks/logs";
+import { repos } from "./mocks/repos";
+import { SCAN_PHASES } from "./theme";
 
-type BackendStatus = "loading" | "ok" | "error";
+type StaticView = "dashboard" | "findings" | "detail";
+type LogView = "systems" | "systemFindings" | "detail" | "componentDetail";
 
-const SEVERITIES: Severity[] = ["low", "medium", "high", "critical"];
-const SOURCES: Source[] = ["code", "log"];
+function nextScanPhase(pct: number): string {
+  return SCAN_PHASES.filter(([threshold]) => pct >= threshold).pop()![1];
+}
 
-const EMPTY_FORM = {
-  ruleId: "",
-  pciRequirement: "",
-  title: "",
-  severity: "medium" as Severity,
-  source: "code" as Source,
-  filePath: "",
-  lineNumber: "",
-  snippet: "",
-};
+function findingKey(f: Pick<Finding, "ruleId" | "filePath" | "lineNumber">): string {
+  return `${f.ruleId}|${f.filePath}|${f.lineNumber}`;
+}
 
 export default function App() {
-  const [backendStatus, setBackendStatus] = useState<BackendStatus>("loading");
-  const [findings, setFindings] = useState<Finding[]>([]);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [section, setSection] = useState<Section>("static");
+  const [configOpen, setConfigOpen] = useState(false);
+  const [view, setView] = useState<StaticView>("dashboard");
+  const [logView, setLogView] = useState<LogView>("systems");
+  const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  async function loadHealth() {
-    try {
-      await getHealth();
-      setBackendStatus("ok");
-    } catch {
-      setBackendStatus("error");
-    }
-  }
+  const [findings, setFindings] = useState<Finding[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [logFindingsState, setLogFindingsState] = useState<Finding[]>(logFindingsMock);
+  const [logsRefreshing, setLogsRefreshing] = useState(false);
 
-  async function loadFindings() {
-    try {
-      const data = await getFindings();
-      setFindings(data);
-    } catch {
-      setError("No se pudieron cargar los findings.");
-    }
-  }
+  const [scanning, setScanning] = useState(false);
+  const [scanPct, setScanPct] = useState(0);
+
+  const [fSev, setFSev] = useState<Severity | "all">("all");
+  const [fReq, setFReq] = useState<string>("all");
+  const [narrow, setNarrow] = useState(window.innerWidth < 1080);
+  const [toast, setToast] = useState<string | null>(null);
+  const [repo, setRepo] = useState(repos[0].value);
+  const [ruleEnabled, setRuleEnabled] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    loadHealth();
-    loadFindings();
+    const onResize = () => setNarrow(window.innerWidth < 1080);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-    if (!form.ruleId || !form.pciRequirement || !form.title || !form.filePath || !form.snippet) {
-      setError("Completa todos los campos.");
-      return;
-    }
+  function loadData() {
+    setLoadError(false);
+    setFindings(null);
+    getFindings()
+      .then(setFindings)
+      .catch(() => setLoadError(true));
+  }
 
-    setSubmitting(true);
+  function showToast(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 4200);
+  }
+
+  function gotoSection(next: Section) {
+    setSection(next);
+    setView("dashboard");
+    setLogView("systems");
+    setSelectedSystemId(null);
+    setSelectedComponentId(null);
+    setSelectedId(null);
+    setFSev("all");
+    setFReq("all");
+  }
+
+  async function startScan() {
+    if (scanning) return;
+    setScanning(true);
+    setScanPct(0);
+
+    await new Promise<void>((resolve) => {
+      let pct = 0;
+      const timer = window.setInterval(() => {
+        pct = Math.min(100, pct + 1.5 + Math.random() * 3.5);
+        setScanPct(Math.round(pct));
+        if (pct >= 100) {
+          window.clearInterval(timer);
+          resolve();
+        }
+      }, 110);
+    });
+
+    // El backend todavía no expone POST /api/scan (docs/07-backend-spec.docs.md §5).
+    // Mientras tanto, "escanear" persiste el fixture de mock-findings.ts vía el
+    // POST /api/findings que ya existe, evitando duplicados por ruleId+filePath+lineNumber.
     try {
-      await createFinding({
-        ...form,
-        lineNumber: form.lineNumber ? Number(form.lineNumber) : null,
-      });
-      setForm(EMPTY_FORM);
-      await loadFindings();
+      const existingKeys = new Set((findings ?? []).map(findingKey));
+      const toCreate = mockFindings.filter((f) => !existingKeys.has(findingKey(f)));
+      for (const f of toCreate) {
+        await createFinding({
+          ruleId: f.ruleId,
+          pciRequirement: f.pciRequirement,
+          title: f.title,
+          severity: f.severity,
+          source: f.source,
+          filePath: f.filePath,
+          lineNumber: f.lineNumber,
+          snippet: f.snippet,
+        });
+      }
+      const fresh = await getFindings();
+      setFindings(fresh);
+      showToast(`Escaneo completado · ${fresh.length} hallazgos detectados`);
     } catch {
-      setError("No se pudo crear el finding.");
+      showToast("El escaneo terminó pero no se pudo guardar en la base de datos");
     } finally {
-      setSubmitting(false);
+      setScanning(false);
+      setScanPct(0);
     }
+  }
+
+  function refreshLogs() {
+    if (logsRefreshing) return;
+    setLogsRefreshing(true);
+    window.setTimeout(() => {
+      setLogsRefreshing(false);
+      setLogFindingsState(logFindingsMock.map((f) => ({ ...f })));
+      const now = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      showToast(`Logs actualizados · ${now}`);
+    }, 1300);
+  }
+
+  // El backend todavía no expone PATCH /api/findings/:id, así que el cambio de
+  // estado es solo local por ahora (ver docs/07-backend-spec.docs.md §5).
+  function changeStatus(id: string, status: Status, isLog: boolean) {
+    if (isLog) {
+      setLogFindingsState((prev) => prev.map((f) => (f.id === id ? { ...f, status } : f)));
+    } else {
+      setFindings((prev) => (prev ? prev.map((f) => (f.id === id ? { ...f, status } : f)) : prev));
+    }
+    showToast("Estado actualizado (local)");
+  }
+
+  function toggleRule(ruleId: string) {
+    setRuleEnabled((prev) => {
+      const on = prev[ruleId] !== false;
+      showToast(`Regla ${ruleId} ${on ? "desactivada" : "activada"}`);
+      return { ...prev, [ruleId]: !on };
+    });
+  }
+
+  const staticFindings = (findings ?? []).filter((f) => f.source === "code");
+  const activeRepo = repos.find((r) => r.value === repo) ?? repos[0];
+  const lastScanLabel = staticFindings.length ? `Último escaneo · ${activeRepo.lastScan} UTC` : "Sin escaneos registrados";
+
+  function renderStatic() {
+    if (loadError) {
+      return (
+        <ErrorState
+          title="No se pudieron cargar los hallazgos"
+          code="GET /api/findings → 500 Internal Server Error"
+          message="La API no respondió. Verifica que el backend esté corriendo (docker compose up) y reintenta."
+          onRetry={loadData}
+        />
+      );
+    }
+    if (findings === null) return <LoadingState />;
+
+    return (
+      <>
+        <div className="tabs">
+          <button className={`tab${view === "dashboard" ? " tab--active" : ""}`} onClick={() => setView("dashboard")}>
+            Resumen
+          </button>
+          <button className={`tab${view !== "dashboard" ? " tab--active" : ""}`} onClick={() => setView("findings")}>
+            Hallazgos
+            <span className="tab__count">{staticFindings.filter((f) => f.status === "open" || f.status === "acknowledged").length}</span>
+          </button>
+        </div>
+
+        {view === "dashboard" && (
+          <DashboardResumen
+            findings={staticFindings}
+            scanning={scanning}
+            scanPct={scanPct}
+            onScan={startScan}
+            onOpenFinding={(id) => {
+              setSelectedId(id);
+              setView("detail");
+            }}
+            onSeeAll={() => setView("findings")}
+            onFilterSeverity={(sev) => {
+              setFSev(sev);
+              setFReq("all");
+              setView("findings");
+            }}
+            narrow={narrow}
+          />
+        )}
+
+        {view === "findings" && (
+          <FindingsList
+            findings={staticFindings}
+            severityFilter={fSev}
+            onSeverityFilterChange={setFSev}
+            requirementFilter={fReq}
+            onRequirementFilterChange={setFReq}
+            onOpenFinding={(id) => {
+              setSelectedId(id);
+              setView("detail");
+            }}
+            onScan={startScan}
+            narrow={narrow}
+          />
+        )}
+
+        {view === "detail" &&
+          (() => {
+            const finding = staticFindings.find((f) => f.id === selectedId);
+            if (!finding) return null;
+            return (
+              <FindingDetail
+                finding={finding}
+                snippetStart={staticSnippetStart[finding.id] ?? finding.lineNumber ?? 1}
+                backLabel="← Volver a hallazgos"
+                onBack={() => setView("findings")}
+                onStatusChange={(status) => changeStatus(finding.id, status, false)}
+              />
+            );
+          })()}
+      </>
+    );
+  }
+
+  function renderLogs() {
+    if (logView === "systems") {
+      return (
+        <LogsSystems
+          logFindings={logFindingsState}
+          refreshing={logsRefreshing}
+          onRefresh={refreshLogs}
+          onOpenSystem={(systemId) => {
+            setSelectedSystemId(systemId);
+            setLogView("systemFindings");
+          }}
+        />
+      );
+    }
+
+    const system = logSystems.find((s) => s.id === selectedSystemId);
+
+    if (logView === "systemFindings" && system) {
+      const findingsForSystem = system.findingIds
+        .map((id) => logFindingsState.find((f) => f.id === id))
+        .filter((f): f is Finding => Boolean(f));
+      return (
+        <LogsSystemFindings
+          system={system}
+          findings={findingsForSystem}
+          onBack={() => {
+            setLogView("systems");
+            setSelectedSystemId(null);
+          }}
+          onOpenFinding={(id) => {
+            setSelectedId(id);
+            setLogView("detail");
+          }}
+          narrow={narrow}
+        />
+      );
+    }
+
+    if (logView === "detail") {
+      const finding = logFindingsState.find((f) => f.id === selectedId);
+      if (!finding) return null;
+      const trace = findingTraces[finding.id];
+      return (
+        <FindingDetail
+          finding={finding}
+          snippetStart={logSnippetStart[finding.id] ?? finding.lineNumber ?? 1}
+          backLabel={`← ${system ? system.name : "sistema"}`}
+          onBack={() => {
+            setLogView("systemFindings");
+            setSelectedId(null);
+          }}
+          onStatusChange={(status) => changeStatus(finding.id, status, true)}
+          traceId={trace?.traceId}
+          components={trace?.components}
+          onOpenComponent={(componentId) => {
+            setSelectedComponentId(componentId);
+            setLogView("componentDetail");
+          }}
+        />
+      );
+    }
+
+    if (logView === "componentDetail") {
+      const finding = logFindingsState.find((f) => f.id === selectedId);
+      const trace = finding ? findingTraces[finding.id] : null;
+      const component = trace?.components.find((c) => c.id === selectedComponentId);
+      if (!component || !trace) return null;
+      return (
+        <LogsComponentDetail
+          component={component}
+          traceId={trace.traceId}
+          logFile={system?.logFile ?? finding?.filePath ?? ""}
+          onBack={() => {
+            setLogView("detail");
+            setSelectedComponentId(null);
+          }}
+        />
+      );
+    }
+
+    return null;
   }
 
   return (
     <div className="app">
-      <header className="app__header">
-        <h1>IONIX Sentinel</h1>
-        <p>Detección temprana de riesgos PCI-DSS en código y logs</p>
-      </header>
+      <Sidebar
+        section={section}
+        configOpen={configOpen}
+        onNavigate={(next) => {
+          if (next === "rules" || next === "repos") setConfigOpen(true);
+          gotoSection(next);
+        }}
+        onToggleConfig={() => setConfigOpen((v) => !v)}
+      />
 
-      <div className={`status status--${backendStatus}`}>
-        {backendStatus === "loading" && "Consultando backend..."}
-        {backendStatus === "ok" && "Backend conectado"}
-        {backendStatus === "error" && "Backend no disponible"}
+      <div className="main">
+        {section === "static" && (
+          <Topbar
+            repos={repos}
+            repo={repo}
+            onRepoChange={(value) => {
+              setRepo(value);
+              showToast(`Repositorio activo → ${value}`);
+            }}
+            lastScanLabel={lastScanLabel}
+          />
+        )}
+
+        <main className="content">
+          {scanning && section === "static" && (
+            <div className="scanning-strip">
+              <div className="scanning-strip__row">
+                <span style={{ color: "#FF8B4D" }}>▸ {nextScanPhase(scanPct)}</span>
+                <span style={{ color: "rgba(245,241,237,0.66)" }}>{scanPct}%</span>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${scanPct}%` }} />
+              </div>
+            </div>
+          )}
+
+          {section === "static" && renderStatic()}
+          {section === "logs" && renderLogs()}
+          {section === "rules" && <ConfigRules enabledMap={ruleEnabled} onToggle={toggleRule} />}
+          {section === "repos" && (
+            <ConfigRepos activeRepo={repo} totalFindings={staticFindings.length} onSelectRepo={(value) => { setRepo(value); showToast(`Repositorio activo → ${value}`); }} onAddRepo={() => showToast("Conecta un repo desde Git (demo)")} />
+          )}
+        </main>
       </div>
 
-      <section>
-        <h2>Nuevo finding</h2>
-        <form className="finding-form" onSubmit={handleSubmit}>
-          <input
-            placeholder="Rule ID (ej: SENTINEL-PAN-001)"
-            value={form.ruleId}
-            onChange={(e) => setForm({ ...form, ruleId: e.target.value })}
-          />
-          <input
-            placeholder="Requisito PCI-DSS (ej: 6.5.1)"
-            value={form.pciRequirement}
-            onChange={(e) => setForm({ ...form, pciRequirement: e.target.value })}
-          />
-          <input
-            placeholder="Título"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
-          <select
-            value={form.severity}
-            onChange={(e) =>
-              setForm({ ...form, severity: e.target.value as Severity })
-            }
-          >
-            {SEVERITIES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select
-            value={form.source}
-            onChange={(e) => setForm({ ...form, source: e.target.value as Source })}
-          >
-            {SOURCES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <input
-            placeholder="Archivo (ej: src/services/payment.ts)"
-            value={form.filePath}
-            onChange={(e) => setForm({ ...form, filePath: e.target.value })}
-          />
-          <input
-            placeholder="Línea"
-            type="number"
-            value={form.lineNumber}
-            onChange={(e) => setForm({ ...form, lineNumber: e.target.value })}
-          />
-          <textarea
-            placeholder="Snippet"
-            rows={3}
-            value={form.snippet}
-            onChange={(e) => setForm({ ...form, snippet: e.target.value })}
-          />
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Creando..." : "Crear finding"}
-          </button>
-        </form>
-        {error && <p style={{ color: "#fca5a5" }}>{error}</p>}
-      </section>
-
-      <section>
-        <h2>Findings registrados</h2>
-        {findings.length === 0 && <p>No hay findings todavía.</p>}
-        <ul className="findings-list">
-          {findings.map((finding) => (
-            <li key={finding.id} className="finding-card">
-              <div className="finding-card__header">
-                <strong>{finding.title}</strong>
-                <span className={`severity-badge severity-${finding.severity}`}>
-                  {finding.severity}
-                </span>
-              </div>
-              <p>
-                {finding.filePath}
-                {finding.lineNumber ? `:${finding.lineNumber}` : ""}
-              </p>
-              <div className="finding-card__meta">
-                PCI: {finding.pciRequirement} · Regla: {finding.ruleId} · Fuente:{" "}
-                {finding.source} · {new Date(finding.createdAt).toLocaleString()}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Toast message={toast} />
     </div>
   );
 }
