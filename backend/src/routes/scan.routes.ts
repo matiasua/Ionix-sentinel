@@ -1,14 +1,30 @@
 import { Router } from "express";
+import { env } from "../config/env";
 import { getLatestScanId, getScanSummary, runScan } from "../scan/service";
 
 export const scanRouter = Router();
 
-scanRouter.post("/api/scan", async (_req, res) => {
+scanRouter.post("/api/scan", async (req, res) => {
+  const bodyPath = typeof req.body?.path === "string" ? req.body.path.trim() : "";
+  const targetPath = bodyPath !== "" ? bodyPath : env.scanTargetPath;
+
+  if (!targetPath) {
+    return res.status(400).json({
+      error:
+        "No se especificó qué repo escanear: pasa { path } en el body de POST /api/scan, o configura SCAN_TARGET_PATH en el .env del backend.",
+    });
+  }
+
   try {
-    const result = await runScan();
+    const result = await runScan(targetPath);
     res.status(201).json(result);
   } catch (error) {
-    res.status(500).json({ error: "Failed to run scan" });
+    // A diferencia del resto de las rutas, acá sí devolvemos error.message:
+    // durante la demo el error más probable es una ruta mal configurada
+    // (SCAN_TARGET_PATH apuntando a una carpeta que no existe en esta
+    // máquina), y ese mensaje ya viene descriptivo desde analysis/runner.ts.
+    const message = error instanceof Error ? error.message : "Failed to run scan";
+    res.status(500).json({ error: message });
   }
 });
 
