@@ -1,0 +1,133 @@
+<svg viewBox="0 0 1040 700" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Dependencias entre tareas del EDT de IONIX Sentinel (actualizado)</title>
+<desc>Diagrama de flujo actualizado: el frontend ya está construido, el PM se suma a ayudar con las reglas del Developer, y todo converge en la integración backend y el swap del scan simulado por el real.</desc>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+  </marker>
+  <marker id="arrowAccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+  </marker>
+</defs>
+
+<style>
+  .box { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.5; }
+  .boxCrit { fill: #eff6ff; stroke: #2563eb; stroke-width: 2.5; }
+  .boxDone { fill: #f0fdf4; stroke: #16a34a; stroke-width: 2; }
+  .title { font-family: Arial, Helvetica, sans-serif; font-size: 13px; font-weight: 600; fill: #0f172a; }
+  .sub { font-family: Arial, Helvetica, sans-serif; font-size: 11px; fill: #475569; }
+  .laneLabel { font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 700; fill: #475569; text-transform: uppercase; letter-spacing: 0.04em; }
+  .edge { stroke: #94a3b8; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  .edgeCrit { stroke: #2563eb; stroke-width: 2; fill: none; marker-end: url(#arrowAccent); }
+</style>
+
+<rect width="1040" height="700" fill="#ffffff"/>
+
+<!-- Kickoff -->
+<rect x="20" y="16" width="1000" height="46" rx="10" class="boxCrit"/>
+<text x="520" y="36" text-anchor="middle" class="title">Bloque 0 — Kickoff (10 min)</text>
+<text x="520" y="52" text-anchor="middle" class="sub">Confirmar rol reasignado del PM · worktree repo demo · env vars</text>
+
+<!-- Frontend ya hecho -->
+<rect x="810" y="80" width="210" height="70" rx="10" class="boxDone"/>
+<text x="915" y="100" text-anchor="middle" class="title">Frontend — YA LISTO</text>
+<text x="915" y="116" text-anchor="middle" class="sub">Gauge, Tiles, Filtros,</text>
+<text x="915" y="130" text-anchor="middle" class="sub">Detalle, ScanButton</text>
+<text x="915" y="144" text-anchor="middle" class="sub">(port Claude Design)</text>
+
+<!-- Lane labels -->
+<text x="130" y="92" text-anchor="middle" class="laneLabel">Developer</text>
+<text x="450" y="92" text-anchor="middle" class="laneLabel">Experto IA</text>
+<text x="290" y="72" text-anchor="middle" class="laneLabel">PM ayuda acá ↓</text>
+
+<!-- Developer + PM lane (critical path) -->
+<rect x="30" y="102" width="200" height="52" rx="10" class="boxCrit"/>
+<text x="130" y="123" text-anchor="middle" class="title">T1.1</text>
+<text x="130" y="139" text-anchor="middle" class="sub">analysis/runner.ts</text>
+
+<rect x="250" y="102" width="200" height="52" rx="10" class="boxCrit"/>
+<text x="350" y="123" text-anchor="middle" class="title">T1.2 (Developer + PM)</text>
+<text x="350" y="139" text-anchor="middle" class="sub">pci-rules.yaml — 6 reglas</text>
+
+<rect x="30" y="184" width="200" height="52" rx="10" class="boxCrit"/>
+<text x="130" y="205" text-anchor="middle" class="title">T1.3 + T1.4 + T1.5</text>
+<text x="130" y="221" text-anchor="middle" class="sub">loader + luhn + mapper</text>
+
+<rect x="30" y="266" width="220" height="52" rx="10" class="boxCrit"/>
+<text x="140" y="287" text-anchor="middle" class="title">T1.6 (Developer + PM QA)</text>
+<text x="140" y="303" text-anchor="middle" class="sub">Validar vs. repo demo</text>
+
+<path class="edgeCrit" d="M130,154 L130,184"/>
+<path class="edgeCrit" d="M350,154 L130,166 L130,184"/>
+<path class="edgeCrit" d="M130,236 L140,266"/>
+
+<!-- Experto IA lane -->
+<rect x="510" y="102" width="200" height="52" rx="10" class="box"/>
+<text x="610" y="123" text-anchor="middle" class="title">T2.1</text>
+<text x="610" y="139" text-anchor="middle" class="sub">reasoning/client.ts</text>
+
+<rect x="510" y="184" width="200" height="52" rx="10" class="box"/>
+<text x="610" y="205" text-anchor="middle" class="title">T2.2 + T2.3</text>
+<text x="610" y="221" text-anchor="middle" class="sub">prompt + parseo defensivo</text>
+
+<rect x="510" y="266" width="200" height="40" rx="10" class="box" stroke-dasharray="4 3"/>
+<text x="610" y="290" text-anchor="middle" class="sub">T2.4 — probar c/ fixtures</text>
+
+<rect x="510" y="326" width="200" height="46" rx="10" class="boxCrit"/>
+<text x="610" y="346" text-anchor="middle" class="title">T2.5</text>
+<text x="610" y="361" text-anchor="middle" class="sub">Probar con findings reales</text>
+
+<path class="edge" d="M610,154 L610,184"/>
+<path class="edge" d="M610,236 L610,266"/>
+<path class="edgeCrit" d="M250,292 L510,349" />
+
+<!-- Ing. Infra lane -->
+<text x="850" y="182" text-anchor="middle" class="laneLabel">Ing. Infra</text>
+<rect x="760" y="192" width="200" height="52" rx="10" class="box"/>
+<text x="860" y="213" text-anchor="middle" class="title">T3.1 + T3.2</text>
+<text x="860" y="229" text-anchor="middle" class="sub">entorno + POST /api/scan</text>
+
+<rect x="760" y="274" width="200" height="46" rx="10" class="box"/>
+<text x="860" y="294" text-anchor="middle" class="title">T3.3 + T3.4 + T3.5</text>
+<text x="860" y="309" text-anchor="middle" class="sub">scan summary + filtros + detalle</text>
+
+<path class="edge" d="M860,244 L860,274"/>
+
+<!-- Convergencia: Integración backend -->
+<rect x="220" y="410" width="500" height="56" rx="10" class="boxCrit"/>
+<text x="470" y="433" text-anchor="middle" class="title">T5.1 — Integración: cablear el pipeline real</text>
+<text x="470" y="450" text-anchor="middle" class="sub">necesita T1.6 + T2.5 + T3.2</text>
+
+<path class="edgeCrit" d="M140,318 L140,438 L220,438" />
+<path class="edgeCrit" d="M610,372 L610,438 L720,438" />
+<path class="edge" d="M860,320 L860,438 L720,438" />
+
+<!-- Probar backend -->
+<rect x="270" y="494" width="400" height="46" rx="10" class="boxCrit"/>
+<text x="470" y="514" text-anchor="middle" class="title">T5.2 + T5.3</text>
+<text x="470" y="529" text-anchor="middle" class="sub">Probar backend en vivo (curl) + arreglar bugs</text>
+<path class="edgeCrit" d="M470,466 L470,494"/>
+
+<!-- Swap frontend -->
+<rect x="770" y="494" width="220" height="60" rx="10" class="boxCrit"/>
+<text x="880" y="516" text-anchor="middle" class="title">T5.4 — PM</text>
+<text x="880" y="532" text-anchor="middle" class="sub">Swap: mock-scan →</text>
+<text x="880" y="546" text-anchor="middle" class="sub">scanRepo() real en App.tsx</text>
+<path class="edgeCrit" d="M915,150 L915,494"/>
+<path class="edgeCrit" d="M670,517 L770,517"/>
+
+<!-- Ensayo -->
+<rect x="270" y="600" width="500" height="52" rx="10" class="boxCrit"/>
+<text x="520" y="622" text-anchor="middle" class="title">Bloque 4 — Ensayo de demo</text>
+<text x="520" y="638" text-anchor="middle" class="sub">T6.1: click real "Escanear repo" → datos reales en dashboard</text>
+<path class="edgeCrit" d="M470,540 L470,570 L520,600"/>
+<path class="edgeCrit" d="M880,554 L880,570 L520,600"/>
+
+<!-- Legend -->
+<rect x="20" y="672" width="18" height="14" class="boxDone"/>
+<text x="46" y="683" class="sub">ya construido</text>
+<rect x="180" y="672" width="18" height="14" class="boxCrit"/>
+<text x="206" y="683" class="sub">camino crítico</text>
+<rect x="340" y="672" width="18" height="14" class="box"/>
+<text x="366" y="683" class="sub">en paralelo, no bloquea</text>
+</svg>
