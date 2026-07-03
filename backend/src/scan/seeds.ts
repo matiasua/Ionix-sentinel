@@ -11,9 +11,9 @@ import { Category, Severity, Source } from "../types/finding";
 // Fuente de verdad de las 7: demo/Ionix-sentinel-demo/findings-expected.json.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type BranchKey = "main" | "develop" | "demo-7" | "demo-3" | "demo-0";
+export type BranchKey = "main" | "develop" | "demo-7" | "demo-3" | "demo-0" | "live-scan";
 
-export const BRANCH_KEYS: BranchKey[] = ["main", "develop", "demo-7", "demo-3", "demo-0"];
+export const BRANCH_KEYS: BranchKey[] = ["main", "develop", "demo-7", "demo-3", "demo-0", "live-scan"];
 
 export const BRANCH_LABEL: Record<BranchKey, string> = {
   main: "main",
@@ -21,6 +21,7 @@ export const BRANCH_LABEL: Record<BranchKey, string> = {
   "demo-7": "demo/7-vulnerabilidades",
   "demo-3": "demo/3-vulnerabilidades",
   "demo-0": "demo/0-vulnerabilidades",
+  "live-scan": "live-scan (análisis real + Claude)",
 };
 
 export interface SeedFinding {
@@ -253,12 +254,17 @@ const ALL_7: SeedFinding[] = [VULN_002, VULN_006, VULN_004, VULN_003B, VULN_009,
 // una por nivel de severidad (crítica / alta / media).
 const DEMO_3: SeedFinding[] = [VULN_002, VULN_003B, VULN_LIB_001];
 
+// "live-scan" no usa este catálogo semilla — scan/service.ts la intercepta
+// antes de llegar acá y corre el pipeline real (rules/ + analysis/ +
+// reasoning/) contra env.scanTargetPath. Queda en el Record solo para que el
+// tipo Record<BranchKey, SeedFinding[]> compile; nunca se lee en runtime.
 export const BRANCH_FINDINGS: Record<BranchKey, SeedFinding[]> = {
   main: [],
   develop: [],
   "demo-7": ALL_7,
   "demo-3": DEMO_3,
   "demo-0": [],
+  "live-scan": [],
 };
 
 export function isBranchKey(value: unknown): value is BranchKey {

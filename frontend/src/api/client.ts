@@ -47,17 +47,6 @@ export interface ScanSummary {
   severityCounts: Partial<Record<Severity, number>>;
 }
 
-export interface LogLine {
-  timestamp: string;
-  level: "info" | "warn" | "error";
-  service: string;
-  route: string;
-  message: string;
-  requestId: string;
-  sourceIp?: string;
-  errorCode?: string;
-}
-
 export interface LogSystemView {
   id: string;
   name: string;
@@ -66,13 +55,25 @@ export interface LogSystemView {
   findingIds: string[];
 }
 
-export interface BranchLogPayload {
-  branch: string;
-  branchLabel: string;
+export interface TraceComponent {
+  id: string;
+  name: string;
+  type: string;
+  status: "ok" | "warning" | "error";
+  line: number;
+  snippetStart: number;
+  snippet: string;
+}
+
+// Salida del análisis de logs del sistema productivo simulado (GET /api/logs).
+export interface LiveLogPayload {
+  system: string;
   logFile: string;
-  lines: LogLine[];
+  generatedAt: string;
+  lineCount: number;
   findings: Finding[];
   systems: LogSystemView[];
+  traces: Record<string, { traceId: string; components: TraceComponent[] }>;
 }
 
 export async function getHealth(): Promise<{ status: string; service: string }> {
@@ -130,8 +131,8 @@ export async function triggerScan(branch: string): Promise<ScanSummary> {
   return res.json();
 }
 
-export async function getLogs(branch: string): Promise<BranchLogPayload> {
-  const res = await fetch(`${API_URL}/api/logs?branch=${encodeURIComponent(branch)}`);
+export async function getLogs(): Promise<LiveLogPayload> {
+  const res = await fetch(`${API_URL}/api/logs`);
   if (!res.ok) throw new Error("Failed to fetch logs");
   return res.json();
 }

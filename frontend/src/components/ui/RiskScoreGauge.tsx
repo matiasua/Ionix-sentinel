@@ -40,7 +40,7 @@ export function RiskScoreGauge({
         {levelLabel}
       </span>
       <span className="risk-gauge__formula">
-        10·crít + 5·alta + 2·media + 1·baja
+        Fórmula: crítico ×10 + alto ×5 + medio ×2 + bajo ×1
         <br />
         sobre hallazgos activos
       </span>

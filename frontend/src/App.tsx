@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { BranchLogPayload, Finding, Status } from "./api/client";
+import type { LiveLogPayload, Finding, Status } from "./api/client";
 import { getFindings, getLogs, triggerScan, updateFindingStatus } from "./api/client";
 import { Sidebar, type Section } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
@@ -10,6 +10,7 @@ import { FindingsList } from "./views/FindingsList";
 import { FindingDetail } from "./views/FindingDetail";
 import { LogsSystems } from "./views/LogsSystems";
 import { LogsSystemFindings } from "./views/LogsSystemFindings";
+import { LogsComponentDetail } from "./views/LogsComponentDetail";
 import { ConfigRules } from "./views/ConfigRules";
 import { ConfigRepos } from "./views/ConfigRepos";
 import { mockFindings, snippetStart as snippetStartById } from "./mocks/findings";
@@ -17,7 +18,7 @@ import { repos } from "./mocks/repos";
 import { SCAN_PHASES } from "./theme";
 
 type StaticView = "dashboard" | "findings" | "detail";
-type LogView = "systems" | "systemFindings" | "detail";
+type LogView = "systems" | "systemFindings" | "detail" | "componentDetail";
 type Severity = Finding["severity"];
 
 function nextScanPhase(pct: number): string {
@@ -38,11 +39,12 @@ export default function App() {
   const [view, setView] = useState<StaticView>("dashboard");
   const [logView, setLogView] = useState<LogView>("systems");
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [findings, setFindings] = useState<Finding[] | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [logData, setLogData] = useState<BranchLogPayload | null>(null);
+  const [logData, setLogData] = useState<LiveLogPayload | null>(null);
   const [logsRefreshing, setLogsRefreshing] = useState(false);
 
   const [scanning, setScanning] = useState(false);
@@ -63,7 +65,7 @@ export default function App() {
 
   useEffect(() => {
     loadData();
-    getLogs(repos[0].value).then(setLogData).catch(() => setLogData(null));
+    getLogs().then(setLogData).catch(() => setLogData(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -85,9 +87,13 @@ export default function App() {
     setView("dashboard");
     setLogView("systems");
     setSelectedSystemId(null);
+    setSelectedComponentId(null);
     setSelectedId(null);
     setFSev("all");
     setFReq("all");
+    // Al entrar al Dashboard de Logs, re-analiza los .log del sistema productivo
+    // para reflejar lo último que se haya generado desde el simulador.
+    if (next === "logs") getLogs().then(setLogData).catch(() => setLogData(null));
   }
 
   const activeRepo = repos.find((r) => r.value === repo) ?? repos[0];
@@ -113,9 +119,8 @@ export default function App() {
 
     try {
       const result = await triggerScan(repo);
-      const [fresh, logs] = await Promise.all([getFindings(), getLogs(repo)]);
+      const fresh = await getFindings();
       setFindings(fresh);
-      setLogData(logs);
       showToast(
         `${activeRepo.name} · ${activeRepo.branch} — ${result.findingsCount} hallazgos · risk score ${result.riskScore}`
       );
@@ -130,13 +135,13 @@ export default function App() {
   function refreshLogs() {
     if (logsRefreshing) return;
     setLogsRefreshing(true);
-    getLogs(logData?.branch ?? repo)
+    getLogs()
       .then((logs) => {
         setLogData(logs);
         const now = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        showToast(`Logs actualizados · ${now}`);
+        showToast(`Logs analizados · ${logs.findings.length} incidentes · ${now}`);
       })
-      .catch(() => showToast("No se pudieron actualizar los logs"))
+      .catch(() => showToast("No se pudieron analizar los logs"))
       .finally(() => setLogsRefreshing(false));
   }
 
@@ -254,10 +259,10 @@ export default function App() {
     if (!logData) {
       return (
         <EmptyState
-          title="Aún no hay logs analizados"
-          description="Selecciona una rama en el dashboard estático y presiona Escanear repo para generar sus logs."
-          ctaLabel="Ir al dashboard estático"
-          onCta={() => gotoSection("static")}
+          title="Aún no hay logs para analizar"
+          description="Genera eventos desde el sistema productivo simulado (log-simulator, :4100) y presiona Actualizar."
+          ctaLabel="Reintentar análisis"
+          onCta={() => getLogs().then(setLogData).catch(() => setLogData(null))}
         />
       );
     }
@@ -303,6 +308,7 @@ export default function App() {
     if (logView === "detail") {
       const finding = logData.findings.find((f) => f.id === selectedId);
       if (!finding) return null;
+      const trace = logData.traces[finding.id];
       return (
         <FindingDetail
           finding={finding}
@@ -313,6 +319,29 @@ export default function App() {
             setSelectedId(null);
           }}
           onStatusChange={(status) => changeStatus(finding.id, status, true)}
+          traceId={trace?.traceId}
+          components={trace?.components}
+          onOpenComponent={(componentId) => {
+            setSelectedComponentId(componentId);
+            setLogView("componentDetail");
+          }}
+        />
+      );
+    }
+
+    if (logView === "componentDetail") {
+      const trace = selectedId ? logData.traces[selectedId] : undefined;
+      const component = trace?.components.find((c) => c.id === selectedComponentId);
+      if (!trace || !component) return null;
+      return (
+        <LogsComponentDetail
+          component={component}
+          traceId={trace.traceId}
+          logFile={logData.logFile}
+          onBack={() => {
+            setLogView("detail");
+            setSelectedComponentId(null);
+          }}
         />
       );
     }
