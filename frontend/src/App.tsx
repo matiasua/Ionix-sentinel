@@ -1,25 +1,23 @@
 import { useEffect, useState } from "react";
-import type { Finding, Status } from "./api/client";
-import { getFindings, triggerScan, updateFindingStatus } from "./api/client";
+import type { BranchLogPayload, Finding, Status } from "./api/client";
+import { getFindings, getLogs, triggerScan, updateFindingStatus } from "./api/client";
 import { Sidebar, type Section } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { Toast } from "./components/ui/Toast";
-import { ErrorState, LoadingState } from "./components/ui/States";
+import { EmptyState, ErrorState, LoadingState } from "./components/ui/States";
 import { DashboardResumen } from "./views/DashboardResumen";
 import { FindingsList } from "./views/FindingsList";
 import { FindingDetail } from "./views/FindingDetail";
 import { LogsSystems } from "./views/LogsSystems";
 import { LogsSystemFindings } from "./views/LogsSystemFindings";
-import { LogsComponentDetail } from "./views/LogsComponentDetail";
 import { ConfigRules } from "./views/ConfigRules";
 import { ConfigRepos } from "./views/ConfigRepos";
 import { mockFindings, snippetStart as snippetStartById } from "./mocks/findings";
-import { findingTraces, logFindings as logFindingsMock, logSnippetStart, logSystems } from "./mocks/logs";
 import { repos } from "./mocks/repos";
 import { SCAN_PHASES } from "./theme";
 
 type StaticView = "dashboard" | "findings" | "detail";
-type LogView = "systems" | "systemFindings" | "detail" | "componentDetail";
+type LogView = "systems" | "systemFindings" | "detail";
 type Severity = Finding["severity"];
 
 function nextScanPhase(pct: number): string {
@@ -29,7 +27,7 @@ function nextScanPhase(pct: number): string {
 // El id de finding lo genera Postgres (UUID) en cada scan, así que no calza con
 // los ids fijos ("fnd_001"...) del fixture de mocks/findings.ts. ruleId sí es
 // estable entre corridas de escaneo — se usa para ubicar la línea de inicio del
-// snippet y resaltar la línea exacta del hallazgo (ver backend/src/scan/fixtures.ts).
+// snippet y resaltar la línea exacta del hallazgo.
 const snippetStartByRuleId: Record<string, number> = Object.fromEntries(
   mockFindings.map((f) => [f.ruleId, snippetStartById[f.id]])
 );
@@ -40,12 +38,11 @@ export default function App() {
   const [view, setView] = useState<StaticView>("dashboard");
   const [logView, setLogView] = useState<LogView>("systems");
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [findings, setFindings] = useState<Finding[] | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [logFindingsState, setLogFindingsState] = useState<Finding[]>(logFindingsMock);
+  const [logData, setLogData] = useState<BranchLogPayload | null>(null);
   const [logsRefreshing, setLogsRefreshing] = useState(false);
 
   const [scanning, setScanning] = useState(false);
@@ -66,6 +63,8 @@ export default function App() {
 
   useEffect(() => {
     loadData();
+    getLogs(repos[0].value).then(setLogData).catch(() => setLogData(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function loadData() {
@@ -86,12 +85,15 @@ export default function App() {
     setView("dashboard");
     setLogView("systems");
     setSelectedSystemId(null);
-    setSelectedComponentId(null);
     setSelectedId(null);
     setFSev("all");
     setFReq("all");
   }
 
+  const activeRepo = repos.find((r) => r.value === repo) ?? repos[0];
+
+  // "Analizar repositorio": el backend borra e inserta los hallazgos de la rama
+  // seleccionada, y regenera su archivo de logs. Refrescamos ambos dashboards.
   async function startScan() {
     if (scanning) return;
     setScanning(true);
@@ -110,10 +112,13 @@ export default function App() {
     });
 
     try {
-      const result = await triggerScan();
-      const fresh = await getFindings();
+      const result = await triggerScan(repo);
+      const [fresh, logs] = await Promise.all([getFindings(), getLogs(repo)]);
       setFindings(fresh);
-      showToast(`Escaneo completado · ${result.findingsCount} hallazgos detectados · risk score ${result.riskScore}`);
+      setLogData(logs);
+      showToast(
+        `${activeRepo.name} · ${activeRepo.branch} — ${result.findingsCount} hallazgos · risk score ${result.riskScore}`
+      );
     } catch {
       showToast("El escaneo terminó pero no se pudo guardar en la base de datos");
     } finally {
@@ -125,21 +130,22 @@ export default function App() {
   function refreshLogs() {
     if (logsRefreshing) return;
     setLogsRefreshing(true);
-    window.setTimeout(() => {
-      setLogsRefreshing(false);
-      setLogFindingsState(logFindingsMock.map((f) => ({ ...f })));
-      const now = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      showToast(`Logs actualizados · ${now}`);
-    }, 1300);
+    getLogs(logData?.branch ?? repo)
+      .then((logs) => {
+        setLogData(logs);
+        const now = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        showToast(`Logs actualizados · ${now}`);
+      })
+      .catch(() => showToast("No se pudieron actualizar los logs"))
+      .finally(() => setLogsRefreshing(false));
   }
 
-  // Los findings de logs son un mock de Fase 2 (el Analizador de Logs todavía no
-  // existe) — su cambio de estado se queda local. Los findings de código sí
-  // persisten vía PATCH /api/findings/:id.
+  // Los findings de logs se sirven desde el archivo generado (no persisten en DB);
+  // su cambio de estado se queda local. Los de código sí persisten vía PATCH.
   function changeStatus(id: string, status: Status, isLog: boolean) {
     if (isLog) {
-      setLogFindingsState((prev) => prev.map((f) => (f.id === id ? { ...f, status } : f)));
-      showToast("Estado actualizado (local · mock de logs)");
+      setLogData((prev) => (prev ? { ...prev, findings: prev.findings.map((f) => (f.id === id ? { ...f, status } : f)) } : prev));
+      showToast("Estado actualizado (local · logs)");
       return;
     }
 
@@ -161,8 +167,9 @@ export default function App() {
   }
 
   const staticFindings = (findings ?? []).filter((f) => f.source === "code");
-  const activeRepo = repos.find((r) => r.value === repo) ?? repos[0];
-  const lastScanLabel = staticFindings.length ? `Último escaneo · ${activeRepo.lastScan} UTC` : "Sin escaneos registrados";
+  const lastScanLabel = staticFindings.length
+    ? `${activeRepo.name} · ${activeRepo.branch}`
+    : "Sin hallazgos — presiona Escanear repo";
 
   function renderStatic() {
     if (loadError) {
@@ -244,10 +251,22 @@ export default function App() {
   }
 
   function renderLogs() {
+    if (!logData) {
+      return (
+        <EmptyState
+          title="Aún no hay logs analizados"
+          description="Selecciona una rama en el dashboard estático y presiona Escanear repo para generar sus logs."
+          ctaLabel="Ir al dashboard estático"
+          onCta={() => gotoSection("static")}
+        />
+      );
+    }
+
     if (logView === "systems") {
       return (
         <LogsSystems
-          logFindings={logFindingsState}
+          logFindings={logData.findings}
+          systems={logData.systems}
           refreshing={logsRefreshing}
           onRefresh={refreshLogs}
           onOpenSystem={(systemId) => {
@@ -258,11 +277,11 @@ export default function App() {
       );
     }
 
-    const system = logSystems.find((s) => s.id === selectedSystemId);
+    const system = logData.systems.find((s) => s.id === selectedSystemId);
 
     if (logView === "systemFindings" && system) {
       const findingsForSystem = system.findingIds
-        .map((id) => logFindingsState.find((f) => f.id === id))
+        .map((id) => logData.findings.find((f) => f.id === id))
         .filter((f): f is Finding => Boolean(f));
       return (
         <LogsSystemFindings
@@ -282,43 +301,18 @@ export default function App() {
     }
 
     if (logView === "detail") {
-      const finding = logFindingsState.find((f) => f.id === selectedId);
+      const finding = logData.findings.find((f) => f.id === selectedId);
       if (!finding) return null;
-      const trace = findingTraces[finding.id];
       return (
         <FindingDetail
           finding={finding}
-          snippetStart={logSnippetStart[finding.id] ?? finding.lineNumber ?? 1}
-          backLabel={`← ${system ? system.name : "sistema"}`}
+          snippetStart={1}
+          backLabel={`← ${system ? system.name : "sistemas"}`}
           onBack={() => {
             setLogView("systemFindings");
             setSelectedId(null);
           }}
           onStatusChange={(status) => changeStatus(finding.id, status, true)}
-          traceId={trace?.traceId}
-          components={trace?.components}
-          onOpenComponent={(componentId) => {
-            setSelectedComponentId(componentId);
-            setLogView("componentDetail");
-          }}
-        />
-      );
-    }
-
-    if (logView === "componentDetail") {
-      const finding = logFindingsState.find((f) => f.id === selectedId);
-      const trace = finding ? findingTraces[finding.id] : null;
-      const component = trace?.components.find((c) => c.id === selectedComponentId);
-      if (!component || !trace) return null;
-      return (
-        <LogsComponentDetail
-          component={component}
-          traceId={trace.traceId}
-          logFile={system?.logFile ?? finding?.filePath ?? ""}
-          onBack={() => {
-            setLogView("detail");
-            setSelectedComponentId(null);
-          }}
         />
       );
     }
@@ -344,8 +338,9 @@ export default function App() {
             repos={repos}
             repo={repo}
             onRepoChange={(value) => {
-              setRepo(value);
-              showToast(`Repositorio activo → ${value}`);
+              setRepo(value as typeof repo);
+              const r = repos.find((x) => x.value === value);
+              showToast(`Rama seleccionada → ${r?.branch ?? value} · presiona Escanear repo para analizar`);
             }}
             lastScanLabel={lastScanLabel}
           />
@@ -368,7 +363,7 @@ export default function App() {
           {section === "logs" && renderLogs()}
           {section === "rules" && <ConfigRules enabledMap={ruleEnabled} onToggle={toggleRule} />}
           {section === "repos" && (
-            <ConfigRepos activeRepo={repo} totalFindings={staticFindings.length} onSelectRepo={(value) => { setRepo(value); showToast(`Repositorio activo → ${value}`); }} onAddRepo={() => showToast("Conecta un repo desde Git (demo)")} />
+            <ConfigRepos activeRepo={repo} totalFindings={staticFindings.length} onSelectRepo={(value) => { setRepo(value as typeof repo); showToast(`Rama seleccionada → ${value}`); }} onAddRepo={() => showToast("Conecta un repo desde Git (demo)")} />
           )}
         </main>
       </div>

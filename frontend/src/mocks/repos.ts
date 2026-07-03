@@ -1,15 +1,19 @@
-// Portado de frontend/design/ionix-sentinel.dc.html — repositorios conectados.
-// Configuración → Repositorios es solo UI local por ahora (sin tabla `repositories` expuesta vía API todavía).
+// Opciones del selector "Repositorio" del topbar. Las 5 son ramas hardcodeadas
+// del mismo repo (payments-core); `value` es la clave que el backend usa para
+// decidir qué hallazgos sembrar al "Analizar repositorio" (ver backend/src/scan/seeds.ts).
+export type BranchKey = "main" | "develop" | "demo-7" | "demo-3" | "demo-0";
+
 export interface RepoDef {
-  value: string;
+  value: BranchKey;
   name: string;
   branch: string;
   lastScan: string;
 }
 
 export const repos: RepoDef[] = [
-  { value: "payments-core", name: "payments-core", branch: "main", lastScan: "02 JUL 2026 09:14" },
-  { value: "ledger-api", name: "ledger-api", branch: "main", lastScan: "01 JUL 2026 18:02" },
-  { value: "fraud-engine", name: "fraud-engine", branch: "develop", lastScan: "30 JUN 2026 11:47" },
-  { value: "merchant-portal", name: "merchant-portal", branch: "main", lastScan: "28 JUN 2026 20:15" },
+  { value: "main", name: "payments-core", branch: "main", lastScan: "—" },
+  { value: "develop", name: "payments-core", branch: "develop", lastScan: "—" },
+  { value: "demo-7", name: "payments-core", branch: "demo/7-vulnerabilidades", lastScan: "—" },
+  { value: "demo-3", name: "payments-core", branch: "demo/3-vulnerabilidades", lastScan: "—" },
+  { value: "demo-0", name: "payments-core", branch: "demo/0-vulnerabilidades", lastScan: "—" },
 ];

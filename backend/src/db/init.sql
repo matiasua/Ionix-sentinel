@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS findings (
   -- el resumen de una corrida se agrega agrupando findings por scan_id).
   scan_id TEXT,
 
+  -- Metadata de la demo del selector "Repositorio": categoría del hallazgo
+  -- (codigo | libreria | pci_compliance) y rama del dropdown que lo generó.
+  category TEXT,
+  branch TEXT,
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -35,3 +40,4 @@ CREATE INDEX IF NOT EXISTS idx_findings_scan_id ON findings (scan_id);
 CREATE INDEX IF NOT EXISTS idx_findings_status ON findings (status);
 CREATE INDEX IF NOT EXISTS idx_findings_severity ON findings (severity);
 CREATE INDEX IF NOT EXISTS idx_findings_source ON findings (source);
+CREATE INDEX IF NOT EXISTS idx_findings_branch ON findings (branch);

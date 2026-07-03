@@ -1,51 +1,86 @@
 import { pool } from "../db/pool";
 import { Severity } from "../types/finding";
 import { computeRiskScore, emptySeverityCounts } from "../lib/severity";
-import { SCAN_FIXTURES } from "./fixtures";
+import { BranchKey, BRANCH_FINDINGS } from "./seeds";
+import { generateBranchLog } from "./logfile";
 
 export interface ScanResult {
   scanId: string;
+  branch: BranchKey;
   findingsCount: number;
   riskScore: number;
   severityCounts: Record<Severity, number>;
 }
 
-// STUB: siembra los findings de `fixtures.ts` bajo un scanId nuevo. Reemplazar
-// el cuerpo de esta función por la invocación real del Analizador Estático
-// (semgrep + rules/ + reasoning/) no cambia el contrato de `POST /api/scan`.
-export async function runScan(): Promise<ScanResult> {
-  const scanId = `scan_${Date.now()}`;
+// "Analizar repositorio" para la rama seleccionada en el dropdown.
+//
+// Es idempotente por diseño: DELETE de TODOS los findings + INSERT del subconjunto
+// de la rama. Repetir el análisis sobre la misma (o cambiar de) rama nunca duplica
+// ni mezcla filas — la tabla siempre queda con exactamente los hallazgos de la
+// última rama analizada. También genera generated-logs/<branch>.log para que el
+// Dashboard de logs quede consistente con el Dashboard estático.
+//
+// STUB honesto: los hallazgos vienen de un catálogo semilla (scan/seeds.ts), no de
+// un analizador estático real (semgrep + reglas + Claude). Reemplazar el cuerpo por
+// el pipeline real no cambia el contrato de `POST /api/scan`.
+export async function runScan(branch: BranchKey): Promise<ScanResult> {
+  const scanId = `scan_${branch}_${Date.now()}`;
+  const seeds = BRANCH_FINDINGS[branch];
 
-  for (const finding of SCAN_FIXTURES) {
-    await pool.query(
-      `INSERT INTO findings
-         (rule_id, pci_requirement, title, severity, source, file_path, line_number, snippet, explanation, remediation, status, scan_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [
-        finding.ruleId,
-        finding.pciRequirement,
-        finding.title,
-        finding.severity,
-        finding.source,
-        finding.filePath,
-        finding.lineNumber,
-        finding.snippet,
-        finding.explanation ?? null,
-        finding.remediation ?? null,
-        finding.status ?? "open",
-        scanId,
-      ]
-    );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // Borra el estado anterior (de cualquier rama) antes de sembrar el nuevo.
+    await client.query("DELETE FROM findings");
+
+    for (const s of seeds) {
+      await client.query(
+        `INSERT INTO findings
+           (rule_id, pci_requirement, title, severity, source, file_path, line_number,
+            snippet, explanation, remediation, status, scan_id, category, branch)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [
+          s.ruleId,
+          s.pciRequirement,
+          s.title,
+          s.severity,
+          s.source,
+          s.filePath,
+          s.lineNumber,
+          s.snippet,
+          s.explanation,
+          s.remediation,
+          "open",
+          scanId,
+          s.category,
+          branch,
+        ]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 
-  const summary = await getScanSummary(scanId);
-  if (!summary) {
-    throw new Error("Failed to compute summary for freshly created scan");
-  }
-  return summary;
+  // Genera el archivo de logs de la rama (artefacto + fuente del Dashboard de logs).
+  generateBranchLog(branch, scanId);
+
+  const severityCounts = emptySeverityCounts();
+  for (const s of seeds) severityCounts[s.severity]++;
+
+  return {
+    scanId,
+    branch,
+    findingsCount: seeds.length,
+    riskScore: computeRiskScore(severityCounts),
+    severityCounts,
+  };
 }
 
-export async function getScanSummary(scanId: string): Promise<ScanResult | null> {
+export async function getScanSummary(scanId: string): Promise<Omit<ScanResult, "branch"> | null> {
   const result = await pool.query(
     "SELECT severity, COUNT(*)::int AS count FROM findings WHERE scan_id = $1 GROUP BY severity",
     [scanId]

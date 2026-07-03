@@ -1,6 +1,5 @@
-import type { Finding } from "../api/client";
+import type { Finding, LogSystemView } from "../api/client";
 import { SeverityBadge } from "../components/ui/SeverityBadge";
-import type { LogSystem } from "../mocks/logs";
 import { reqLabelOf, sortBySeverityDesc, sourceLabelOf } from "../utils/findings";
 
 export function LogsSystemFindings({
@@ -10,7 +9,7 @@ export function LogsSystemFindings({
   onOpenFinding,
   narrow,
 }: {
-  system: LogSystem;
+  system: LogSystemView;
   findings: Finding[];
   onBack: () => void;
   onOpenFinding: (id: string) => void;

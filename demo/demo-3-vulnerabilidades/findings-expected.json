@@ -1,0 +1,22 @@
+{
+  "_readme": "Variante demo/3-vulnerabilidades: subconjunto de la demo con SOLO 3 hallazgos activos (una por categoría codigo | libreria | pci_compliance y una por severidad crítica/alta/media). Las otras 4 de la variante de 7 (VULN-006, VULN-004, VULN-009, VULN-011) están corregidas en el código de esta carpeta. Es el material de referencia detrás de la opción 'payments-core · demo/3-vulnerabilidades' del selector; el backend siembra estas 3 filas (ver backend/src/scan/seeds.ts).",
+
+  "real_violations": [
+    { "id": "VULN-002", "category": "pci_compliance", "origin": "code", "file": "migrations/001_init.sql", "line": 8, "pci_dss_requirement": "3.5.1", "title": "PAN almacenado en texto plano en la base de datos", "severity": "critical" },
+    { "id": "VULN-003b", "category": "codigo", "origin": "code", "file": "pages/api/payments/charge.ts", "line": 14, "pci_dss_requirement": "6.2.4", "title": "Inyección SQL por concatenación de strings con datos de usuario", "severity": "high" },
+    { "id": "VULN-LIB-001", "category": "libreria", "origin": "code", "file": "package.json", "line": 17, "pci_dss_requirement": "6.3.3", "title": "Dependencia con vulnerabilidad crítica conocida (lodash 4.17.15 — CVE-2020-8203, prototype pollution)", "severity": "medium" }
+  ],
+
+  "corregidas_respecto_a_7": [
+    { "id": "VULN-006", "file": "pages/api/payments/[id].ts", "fix": "Verificación de sesión + rol antes de responder; PAN enmascarado." },
+    { "id": "VULN-004", "file": "lib/crypto.ts", "fix": "Se eliminó clave hardcodeada y AES-128-ECB; usa encryptPanStrong (AES-256-GCM)." },
+    { "id": "VULN-009", "file": "pages/api/webhooks/stripe.ts", "fix": "API key leída desde process.env.STRIPE_SECRET_KEY." },
+    { "id": "VULN-011", "file": "lib/db.ts", "fix": "ssl: { rejectUnauthorized: true } — TLS obligatorio." }
+  ],
+
+  "negative_controls": [
+    { "id": "TRAP-T1", "origin": "code", "file": "lib/testCards.ts", "line": 7, "title": "Secuencias de 16 dígitos que fallan Luhn — no son PAN reales", "expected_behavior": "NO debe reportarse como hallazgo de PAN expuesto" },
+    { "id": "TRAP-T2", "origin": "code", "file": "lib/mask.ts", "line": 8, "title": "Implementación correcta de enmascaramiento de PAN (first6+last4)", "expected_behavior": "NO debe reportarse como hallazgo" },
+    { "id": "TRAP-T3", "origin": "code", "file": "lib/crypto.ts", "line": 22, "title": "encryptPanStrong: AES-256-GCM con clave desde env var e IV aleatorio", "expected_behavior": "NO debe reportarse como hallazgo" }
+  ]
+}

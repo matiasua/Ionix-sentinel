@@ -1,0 +1,5 @@
+node_modules/
+.next/
+.env
+*.log
+!logs/production-sample.log
