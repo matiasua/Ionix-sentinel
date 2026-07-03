@@ -14,6 +14,8 @@ export function FindingDetail({
   traceId,
   components,
   onOpenComponent,
+  onGenerateSolution,
+  solvingSolution,
 }: {
   finding: Finding;
   snippetStart: number;
@@ -23,6 +25,10 @@ export function FindingDetail({
   traceId?: string;
   components?: TraceComponent[];
   onOpenComponent?: (componentId: string) => void;
+  // Solo se pasa para findings de código (los de logs no tienen fila en
+  // `findings` — no hay dónde persistir la solución, ver App.tsx).
+  onGenerateSolution?: () => void;
+  solvingSolution?: boolean;
 }) {
   const lines = buildSnippetLines(finding.snippet, snippetStart, finding.lineNumber);
 
@@ -64,7 +70,52 @@ export function FindingDetail({
             <h3>Cómo corregirlo</h3>
             <span className="claude-tag">✦ GENERADO POR CLAUDE</span>
           </div>
-          <p>{finding.remediation}</p>
+
+          {finding.codeSolution ? (
+            <>
+              <div className="solution-diff">
+                <div className="solution-diff__block solution-diff__block--before">
+                  <span className="solution-diff__label solution-diff__label--before">− antes</span>
+                  <pre className="solution-diff__code">{finding.codeSolution.codeBefore}</pre>
+                </div>
+                <div className="solution-diff__block solution-diff__block--after">
+                  <span className="solution-diff__label solution-diff__label--after">+ después</span>
+                  <pre className="solution-diff__code">{finding.codeSolution.codeAfter}</pre>
+                </div>
+              </div>
+              <p>{finding.codeSolution.explanation}</p>
+              {finding.codeSolutionStatus === "error" && (
+                <p style={{ color: "var(--red)", fontSize: 13 }}>
+                  La última generación falló — el bloque de arriba es un respaldo, no un fix real. Intenta de nuevo.
+                </p>
+              )}
+              {onGenerateSolution && (
+                <button
+                  className={`btn btn-outline-dashed${solvingSolution ? " btn-primary--busy" : ""}`}
+                  disabled={solvingSolution}
+                  onClick={onGenerateSolution}
+                >
+                  {solvingSolution ? "Generando…" : "↻ Regenerar solución"}
+                </button>
+              )}
+            </>
+          ) : onGenerateSolution ? (
+            <>
+              <p style={{ color: "var(--text-faint)" }}>
+                Aún no se generó una solución de código para este hallazgo. Claude puede leer el snippet y el
+                diagnóstico de arriba y proponer el fix.
+              </p>
+              <button
+                className={`btn btn-primary${solvingSolution ? " btn-primary--busy" : ""}`}
+                disabled={solvingSolution}
+                onClick={onGenerateSolution}
+              >
+                {solvingSolution ? "Generando solución…" : "✦ Generar solución"}
+              </button>
+            </>
+          ) : (
+            <p>{finding.remediation}</p>
+          )}
         </div>
       </div>
 

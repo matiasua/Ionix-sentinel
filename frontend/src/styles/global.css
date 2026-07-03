@@ -886,6 +886,56 @@ select option {
   white-space: nowrap;
 }
 
+/* ── Solución de código on-demand (botón "Generar solución") ── */
+.solution-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.solution-diff__block {
+  background: #0b0a0a;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.solution-diff__block--before {
+  border-left: 2px solid var(--red);
+}
+
+.solution-diff__block--after {
+  border-left: 2px solid var(--green);
+}
+
+.solution-diff__label {
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  padding: 8px 14px 0;
+}
+
+.solution-diff__label--before {
+  color: var(--red);
+}
+
+.solution-diff__label--after {
+  color: var(--green);
+}
+
+.solution-diff__code {
+  margin: 0;
+  padding: 10px 14px 14px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: rgba(245, 241, 237, 0.85);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
 .status-select {
   background: var(--bg-input);
   border: 1px solid var(--border-strong);
