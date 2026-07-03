@@ -5,6 +5,7 @@ import { computeRiskScore, emptySeverityCounts } from "../lib/severity";
 import { loadRules } from "../rules/loader";
 import { runAnalysis } from "../analysis/runner";
 import { mapMatchesToFindings } from "../analysis/mapper";
+import { enrichFinding } from "../reasoning/client";
 import type { Rule } from "../types/rule";
 
 export interface ScanResult {
@@ -33,30 +34,38 @@ function getRules(): Rule[] {
   return cachedRules;
 }
 
-// T5.1 — Pipeline real del Analizador Estático (T1.1-T1.5), reemplaza el stub
-// que sembraba SCAN_FIXTURES (ver scan/fixtures.ts, que queda sin uso pero no
-// se borra: sirve de referencia de shape para quien construya el Motor de
-// Razonamiento). `targetPath` es la carpeta de código a escanear — en la demo,
-// el checkout de pci-dss-vulnerable-demo (rama pci-vulnerable-demo).
-//
-// El Motor de Razonamiento (T2.x, "enrichFinding") todavía no existe: los
-// findings se insertan sin `explanation`/`remediation` (quedan NULL en la
-// tabla) y `reasoning_status` se queda en su default `'ok'`. Cuando T2.x esté
-// listo, el enriquecimiento se agrega entre `mapMatchesToFindings` y el
-// `INSERT`, sin cambiar la firma de este export ni el contrato de
-// `POST /api/scan`.
+// T5.1 completo — Pipeline real de punta a punta: Analizador Estático
+// (T1.1-T1.5) + Motor de Razonamiento (T2.1-T2.3), reemplaza el stub que
+// sembraba SCAN_FIXTURES (ver scan/fixtures.ts, que queda sin uso pero no se
+// borra: documenta el shape esperado). `targetPath` es la carpeta de código
+// a escanear — en la demo, el checkout de pci-dss-vulnerable-demo (rama
+// pci-vulnerable-demo).
 export async function runScan(targetPath: string): Promise<ScanResult> {
   const rules = getRules();
   const matches = runAnalysis(targetPath, rules);
-  const findings = mapMatchesToFindings(matches, rules);
+  const rawFindings = mapMatchesToFindings(matches, rules);
+
+  // enrichFinding() nunca lanza (ver reasoning/client.ts): si Claude falla
+  // para un finding puntual, ese finding se guarda igual con
+  // reasoningStatus: "error" en vez de tumbar el scan completo. Se corren en
+  // paralelo — para el tamaño de repo de la demo (10-25 findings) no vale la
+  // pena pagar el costo de llamadas secuenciales a la API. Si en algún
+  // momento el repo escaneado crece mucho, acá es donde limitar cuántos
+  // findings se enriquecen en vivo (ver "T5.3" en docs/wbs.md).
+  const findings = await Promise.all(
+    rawFindings.map(async (finding) => {
+      const enrichment = await enrichFinding(finding);
+      return { ...finding, ...enrichment };
+    })
+  );
 
   const scanId = `scan_${Date.now()}`;
 
   for (const finding of findings) {
     await pool.query(
       `INSERT INTO findings
-         (rule_id, pci_requirement, title, severity, source, file_path, line_number, snippet, explanation, remediation, status, scan_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+         (rule_id, pci_requirement, title, severity, source, file_path, line_number, snippet, explanation, remediation, status, scan_id, reasoning_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         finding.ruleId,
         finding.pciRequirement,
@@ -66,10 +75,11 @@ export async function runScan(targetPath: string): Promise<ScanResult> {
         finding.filePath,
         finding.lineNumber,
         finding.snippet,
-        finding.explanation ?? null,
-        finding.remediation ?? null,
+        finding.explanation,
+        finding.remediation,
         finding.status ?? "open",
         scanId,
+        finding.reasoningStatus,
       ]
     );
   }
