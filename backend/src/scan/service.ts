@@ -94,6 +94,8 @@ async function runLiveScan(): Promise<InsertableFinding[]> {
     })
   );
 
+  logTokenUsage(enriched);
+
   return enriched.map((finding) => ({
     ruleId: finding.ruleId,
     pciRequirement: finding.pciRequirement,
@@ -107,6 +109,30 @@ async function runLiveScan(): Promise<InsertableFinding[]> {
     remediation: finding.remediation,
     category: RULE_CATEGORY[finding.ruleId] ?? "pci_compliance",
   }));
+}
+
+// Reporta cuánto gastó el Motor de Razonamiento en este scan — pregunta
+// típica de costos/negocio en la demo. Se calcula sobre `usage` real que
+// devuelve cada llamada a Claude (reasoning/client.ts), no una estimación.
+function logTokenUsage(enriched: Array<{ ruleId: string; usage: { inputTokens: number; outputTokens: number } | null }>): void {
+  const withUsage = enriched.filter((f) => f.usage !== null) as Array<{
+    ruleId: string;
+    usage: { inputTokens: number; outputTokens: number };
+  }>;
+  if (withUsage.length === 0) {
+    console.log("[reasoning] sin datos de consumo de tokens (ninguna llamada a Claude llegó a responder)");
+    return;
+  }
+
+  const totalInput = withUsage.reduce((sum, f) => sum + f.usage.inputTokens, 0);
+  const totalOutput = withUsage.reduce((sum, f) => sum + f.usage.outputTokens, 0);
+  const total = totalInput + totalOutput;
+
+  console.log(
+    `[reasoning] consumo de tokens — ${withUsage.length} hallazgo(s) enriquecido(s): ` +
+      `${totalInput} tokens de entrada + ${totalOutput} de salida = ${total} totales ` +
+      `(promedio ${Math.round(total / withUsage.length)} tokens/hallazgo)`
+  );
 }
 
 function seedFindingsFor(branch: BranchKey): InsertableFinding[] {

@@ -17,12 +17,23 @@ import { parseEnrichmentResponse } from "./parse";
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
 const MAX_TOKENS = 1024;
 
+// Consumo real de tokens de una llamada a Claude — se usa para reportar
+// cuánto gasta el Motor de Razonamiento por hallazgo/por scan (pregunta
+// típica de negocio/costos en la demo). `null` cuando la llamada nunca
+// llegó a responder (ej. ANTHROPIC_API_KEY faltante, error de red antes de
+// recibir respuesta) — en ese caso no se gastaron tokens.
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface EnrichmentOutcome {
   pciRequirement: string;
   severity: Severity;
   explanation: string;
   remediation: string;
   reasoningStatus: "ok" | "error";
+  usage: TokenUsage | null;
 }
 
 // Cliente lazy: si ANTHROPIC_API_KEY no está configurada, el error solo
@@ -44,6 +55,7 @@ function getClient(): Anthropic {
 }
 
 export async function enrichFinding(raw: CreateFindingInput): Promise<EnrichmentOutcome> {
+  let usage: TokenUsage | null = null;
   try {
     const prompt = buildEnrichmentPrompt(raw);
     const response = await getClient().messages.create({
@@ -51,6 +63,10 @@ export async function enrichFinding(raw: CreateFindingInput): Promise<Enrichment
       max_tokens: MAX_TOKENS,
       messages: [{ role: "user", content: prompt }],
     });
+
+    // Se captura ANTES de intentar parsear: si el parseo falla más abajo, los
+    // tokens ya se gastaron igual y queremos que cuenten en el reporte.
+    usage = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
 
     const textBlock = response.content.find(
       (block): block is Anthropic.TextBlock => block.type === "text"
@@ -60,13 +76,13 @@ export async function enrichFinding(raw: CreateFindingInput): Promise<Enrichment
     }
 
     const enrichment = parseEnrichmentResponse(textBlock.text);
-    return { ...enrichment, reasoningStatus: "ok" };
+    return { ...enrichment, reasoningStatus: "ok", usage };
   } catch (error) {
-    return buildFallback(raw, error);
+    return buildFallback(raw, error, usage);
   }
 }
 
-function buildFallback(raw: CreateFindingInput, error: unknown): EnrichmentOutcome {
+function buildFallback(raw: CreateFindingInput, error: unknown, usage: TokenUsage | null): EnrichmentOutcome {
   const reason = error instanceof Error ? error.message : String(error);
   // No usamos el logger de la app (no hay uno compartido todavía) — un
   // console.error identificable alcanza para diagnosticar en la demo sin
@@ -83,5 +99,6 @@ function buildFallback(raw: CreateFindingInput, error: unknown): EnrichmentOutco
     remediation:
       "Revisar manualmente este hallazgo — el enriquecimiento automático con Claude falló para este caso.",
     reasoningStatus: "error",
+    usage,
   };
 }
