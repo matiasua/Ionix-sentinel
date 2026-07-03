@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LiveLogPayload, Finding, Status } from "./api/client";
 import {
   generateCodeSolution,
@@ -33,6 +33,13 @@ function nextScanPhase(pct: number): string {
   return SCAN_PHASES.filter(([threshold]) => pct >= threshold).pop()![1];
 }
 
+// Auto-refresco real del Dashboard dinámico (logs): mientras esa sección esté
+// activa, se vuelve a analizar el log del sistema productivo cada 5s, sin
+// pisar un refresco manual en curso. LOG_AUTO_REFRESH_MS es la única fuente
+// de verdad — el texto "Auto-refresco cada N s" en LogsSystems se calcula a
+// partir de esto, ya no está hardcodeado.
+const LOG_AUTO_REFRESH_MS = 5000;
+
 // El id de finding lo genera Postgres (UUID) en cada scan, así que no calza con
 // los ids fijos ("fnd_001"...) del fixture de mocks/findings.ts. ruleId sí es
 // estable entre corridas de escaneo — se usa para ubicar la línea de inicio del
@@ -54,6 +61,10 @@ export default function App() {
   const [loadError, setLoadError] = useState(false);
   const [logData, setLogData] = useState<LiveLogPayload | null>(null);
   const [logsRefreshing, setLogsRefreshing] = useState(false);
+  const logsRefreshingRef = useRef(logsRefreshing);
+  useEffect(() => {
+    logsRefreshingRef.current = logsRefreshing;
+  }, [logsRefreshing]);
 
   const [scanning, setScanning] = useState(false);
   const [scanPct, setScanPct] = useState(0);
@@ -88,6 +99,21 @@ export default function App() {
     getLogs().then(setLogData).catch(() => setLogData(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Mientras se está viendo el Dashboard dinámico, refresca los logs solo
+  // cada LOG_AUTO_REFRESH_MS sin depender de que el usuario apriete el botón.
+  // Falla silenciosa: si un tick falla, no interrumpe el auto-refresco ni
+  // muestra un toast (el botón manual sí avisa con toast, ver refreshLogs()).
+  useEffect(() => {
+    if (section !== "logs") return;
+    const timer = window.setInterval(() => {
+      if (logsRefreshingRef.current) return;
+      getLogs()
+        .then(setLogData)
+        .catch(() => {});
+    }, LOG_AUTO_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [section]);
 
   function loadData() {
     setLoadError(false);
@@ -350,6 +376,7 @@ export default function App() {
           systems={logData.systems}
           refreshing={logsRefreshing}
           onRefresh={refreshLogs}
+          autoRefreshSeconds={LOG_AUTO_REFRESH_MS / 1000}
           onOpenSystem={(systemId) => {
             setSelectedSystemId(systemId);
             setLogView("systemFindings");

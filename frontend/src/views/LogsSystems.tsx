@@ -10,12 +10,16 @@ export function LogsSystems({
   refreshing,
   onRefresh,
   onOpenSystem,
+  autoRefreshSeconds,
 }: {
   logFindings: Finding[];
   systems: LogSystemView[];
   refreshing: boolean;
   onRefresh: () => void;
   onOpenSystem: (systemId: string) => void;
+  // Cada cuántos segundos se refresca solo este dashboard (ver
+  // LOG_AUTO_REFRESH_MS en App.tsx) — ya no es un texto fijo.
+  autoRefreshSeconds: number;
 }) {
   const active = logFindings.filter((f) => f.status === "open" || f.status === "acknowledged");
   const counts = countBySeverity(active);
@@ -62,7 +66,7 @@ export function LogsSystems({
             )}
           </button>
           <span className="mono" style={{ fontSize: 11, color: "rgba(245,241,237,0.4)" }}>
-            Auto-refresco cada 60 s
+            Auto-refresco cada {autoRefreshSeconds} s
           </span>
         </div>
       </div>
