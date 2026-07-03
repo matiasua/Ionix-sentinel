@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Logs generados en runtime por el scan (backend/src/scan/logfile.ts)
+backend/generated-logs/

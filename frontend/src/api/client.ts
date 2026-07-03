@@ -41,9 +41,38 @@ export interface FindingFilters {
 
 export interface ScanSummary {
   scanId: string | null;
+  branch?: string;
   findingsCount: number;
   riskScore: number;
   severityCounts: Partial<Record<Severity, number>>;
+}
+
+export interface LogLine {
+  timestamp: string;
+  level: "info" | "warn" | "error";
+  service: string;
+  route: string;
+  message: string;
+  requestId: string;
+  sourceIp?: string;
+  errorCode?: string;
+}
+
+export interface LogSystemView {
+  id: string;
+  name: string;
+  role: string;
+  logFile: string;
+  findingIds: string[];
+}
+
+export interface BranchLogPayload {
+  branch: string;
+  branchLabel: string;
+  logFile: string;
+  lines: LogLine[];
+  findings: Finding[];
+  systems: LogSystemView[];
 }
 
 export async function getHealth(): Promise<{ status: string; service: string }> {
@@ -91,9 +120,19 @@ export async function updateFindingStatus(id: string, status: Status): Promise<F
   return res.json();
 }
 
-export async function triggerScan(): Promise<ScanSummary> {
-  const res = await fetch(`${API_URL}/api/scan`, { method: "POST" });
+export async function triggerScan(branch: string): Promise<ScanSummary> {
+  const res = await fetch(`${API_URL}/api/scan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branch }),
+  });
   if (!res.ok) throw new Error("Failed to trigger scan");
+  return res.json();
+}
+
+export async function getLogs(branch: string): Promise<BranchLogPayload> {
+  const res = await fetch(`${API_URL}/api/logs?branch=${encodeURIComponent(branch)}`);
+  if (!res.ok) throw new Error("Failed to fetch logs");
   return res.json();
 }
 

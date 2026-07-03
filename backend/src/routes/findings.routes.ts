@@ -25,6 +25,8 @@ function mapRowToFinding(row: any): Finding {
     status: row.status,
     scanId: row.scan_id,
     reasoningStatus: row.reasoning_status,
+    category: row.category ?? null,
+    branch: row.branch ?? null,
     createdAt: row.created_at,
   };
 }

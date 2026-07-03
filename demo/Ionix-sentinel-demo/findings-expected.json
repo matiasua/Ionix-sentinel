@@ -1,0 +1,19 @@
+{
+  "_readme": "Ground truth curado para la demo de IONIX Sentinel: exactamente 7 vulnerabilidades de código estático (rama demo/7-vulnerabilidades), pensadas para que el botón 'Escanear repo' del dashboard inserte estas 7 filas en Postgres. El fixture original (12 escenarios / 18 sub-hallazgos + fixtures de logs para Fase 2) sigue completo en la rama 'main' de este mismo repo, sin curar, por si se necesita ampliar la cobertura más adelante. Cada entrada tiene 'category' en codigo | libreria | pci_compliance: es una clasificación por naturaleza técnica dominante para esta demo — en la práctica TODAS mapean a un requisito PCI-DSS, como corresponde al proyecto.",
+
+  "real_violations": [
+    { "id": "VULN-002", "category": "pci_compliance", "origin": "code", "file": "migrations/001_init.sql", "line": 8, "pci_dss_requirement": "3.5.1", "title": "PAN almacenado en texto plano en la base de datos", "severity": "critical" },
+    { "id": "VULN-006", "category": "pci_compliance", "origin": "code", "file": "pages/api/payments/[id].ts", "line": 8, "pci_dss_requirement": "7.2.1", "title": "Endpoint sin autenticación ni autorización que expone el PAN completo", "severity": "critical" },
+    { "id": "VULN-004", "category": "codigo", "origin": "code", "file": "lib/crypto.ts", "line": 7, "pci_dss_requirement": "3.6.1", "title": "Clave de cifrado hardcodeada y modo AES-128-ECB (débil) para proteger el PAN", "severity": "high" },
+    { "id": "VULN-003b", "category": "codigo", "origin": "code", "file": "pages/api/payments/charge.ts", "line": 14, "pci_dss_requirement": "6.2.4", "title": "Inyección SQL por concatenación de strings con datos de usuario", "severity": "high" },
+    { "id": "VULN-009", "category": "codigo", "origin": "code", "file": "pages/api/webhooks/stripe.ts", "line": 7, "pci_dss_requirement": "8.6.2", "title": "API key de proveedor de pagos (Stripe) hardcodeada en el código fuente", "severity": "high" },
+    { "id": "VULN-011", "category": "pci_compliance", "origin": "code", "file": "lib/db.ts", "line": 10, "pci_dss_requirement": "4.2.1", "title": "Conexión a la base de datos sin TLS (ssl: false) para tráfico que incluye PAN", "severity": "medium" },
+    { "id": "VULN-LIB-001", "category": "libreria", "origin": "code", "file": "package.json", "line": 17, "pci_dss_requirement": "6.3.3", "title": "Dependencia con vulnerabilidad crítica conocida (lodash 4.17.15 — CVE-2020-8203, prototype pollution)", "severity": "medium" }
+  ],
+
+  "negative_controls": [
+    { "id": "TRAP-T1", "origin": "code", "file": "lib/testCards.ts", "line": 7, "title": "Secuencias de 16 dígitos que fallan Luhn — no son PAN reales", "expected_behavior": "NO debe reportarse como hallazgo de PAN expuesto" },
+    { "id": "TRAP-T2", "origin": "code", "file": "lib/mask.ts", "line": 8, "title": "Implementación correcta de enmascaramiento de PAN (first6+last4)", "expected_behavior": "NO debe reportarse como hallazgo" },
+    { "id": "TRAP-T3", "origin": "code", "file": "lib/crypto.ts", "line": 22, "title": "encryptPanStrong: AES-256-GCM con clave desde env var e IV aleatorio", "expected_behavior": "NO debe reportarse como hallazgo (o, si se reporta, debe ser severidad informativa, no violación)" }
+  ]
+}

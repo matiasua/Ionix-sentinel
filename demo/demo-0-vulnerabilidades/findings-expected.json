@@ -1,0 +1,21 @@
+{
+  "_readme": "Variante demo/0-vulnerabilidades: las 7 vulnerabilidades están corregidas en el código; el repo de pagos queda funcional y seguro. Es el material de referencia detrás de la opción 'payments-core · demo/0-vulnerabilidades' del selector — al Analizar, el backend borra la tabla y no inserta ningún hallazgo (0 filas). Los controles negativos siguen presentes en el código y, correctamente, tampoco generan hallazgo.",
+
+  "real_violations": [],
+
+  "corregidas_respecto_a_7": [
+    { "id": "VULN-002", "file": "migrations/001_init.sql", "fix": "PAN ya no se almacena en claro: se guarda pan_token + pan_last4." },
+    { "id": "VULN-003b", "file": "pages/api/payments/charge.ts", "fix": "Consulta parametrizada con bindings ($1..$4)." },
+    { "id": "VULN-004", "file": "lib/crypto.ts", "fix": "Sin clave hardcodeada ni AES-128-ECB; usa encryptPanStrong (AES-256-GCM)." },
+    { "id": "VULN-006", "file": "pages/api/payments/[id].ts", "fix": "Verificación de sesión + rol; ya no se expone el PAN." },
+    { "id": "VULN-009", "file": "pages/api/webhooks/stripe.ts", "fix": "API key desde process.env.STRIPE_SECRET_KEY." },
+    { "id": "VULN-011", "file": "lib/db.ts", "fix": "ssl: { rejectUnauthorized: true } — TLS obligatorio." },
+    { "id": "VULN-LIB-001", "file": "package.json", "fix": "lodash actualizado a ^4.17.21 (parcha CVE-2020-8203 y CVE-2021-23337)." }
+  ],
+
+  "negative_controls": [
+    { "id": "TRAP-T1", "origin": "code", "file": "lib/testCards.ts", "line": 7, "title": "Secuencias de 16 dígitos que fallan Luhn — no son PAN reales", "expected_behavior": "NO debe reportarse como hallazgo de PAN expuesto" },
+    { "id": "TRAP-T2", "origin": "code", "file": "lib/mask.ts", "line": 8, "title": "Implementación correcta de enmascaramiento de PAN (first6+last4)", "expected_behavior": "NO debe reportarse como hallazgo" },
+    { "id": "TRAP-T3", "origin": "code", "file": "lib/crypto.ts", "line": 22, "title": "encryptPanStrong: AES-256-GCM con clave desde env var e IV aleatorio", "expected_behavior": "NO debe reportarse como hallazgo" }
+  ]
+}

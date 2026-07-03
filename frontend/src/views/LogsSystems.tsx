@@ -1,16 +1,18 @@
-import type { Finding } from "../api/client";
+import type { Finding, LogSystemView } from "../api/client";
 import { RiskScoreGauge } from "../components/ui/RiskScoreGauge";
 import { SeverityTiles } from "../components/ui/SeverityTiles";
-import { logSystems, systemHealth } from "../mocks/logs";
+import { systemHealth } from "../mocks/logs";
 import { computeRiskScore, countBySeverity, riskLevel } from "../theme";
 
 export function LogsSystems({
   logFindings,
+  systems: systemDefs,
   refreshing,
   onRefresh,
   onOpenSystem,
 }: {
   logFindings: Finding[];
+  systems: LogSystemView[];
   refreshing: boolean;
   onRefresh: () => void;
   onOpenSystem: (systemId: string) => void;
@@ -20,7 +22,7 @@ export function LogsSystems({
   const riskScore = computeRiskScore(counts);
   const level = riskLevel(riskScore);
 
-  const systems = logSystems.map((sys) => {
+  const systems = systemDefs.map((sys) => {
     const fs = sys.findingIds.map((id) => logFindings.find((f) => f.id === id)).filter(Boolean) as Finding[];
     const health = systemHealth(fs);
     const traffic =
