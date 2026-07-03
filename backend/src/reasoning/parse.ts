@@ -59,8 +59,51 @@ export function extractJsonBlock(text: string): string {
   throw new Error("La respuesta de Claude tiene un bloque JSON sin cerrar (llaves desbalanceadas)");
 }
 
+// Claude a veces devuelve saltos de línea / tabs LITERALES dentro de un
+// valor de string del JSON (en vez de escaparlos como \n) — especialmente en
+// "explanation"/"remediation" cuando la respuesta es larga. Eso es JSON
+// inválido y rompe JSON.parse con un error confuso ("Expected ',' or '}'").
+// Esta pasada recorre el bloque con el mismo criterio de "¿estoy dentro de
+// un string?" que extractJsonBlock, y escapa esos caracteres de control
+// SOLO cuando aparecen dentro de un string — nunca toca el whitespace fuera
+// de comillas, que es válido y no hace falta tocar.
+function sanitizeControlCharsInStrings(jsonBlock: string): string {
+  let result = "";
+  let inString = false;
+  let escapeNext = false;
+
+  for (const char of jsonBlock) {
+    if (escapeNext) {
+      result += char;
+      escapeNext = false;
+      continue;
+    }
+    if (char === "\\" && inString) {
+      result += char;
+      escapeNext = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      result += char;
+      continue;
+    }
+    if (inString && char === "\n") {
+      result += "\\n";
+    } else if (inString && char === "\r") {
+      result += "\\r";
+    } else if (inString && char === "\t") {
+      result += "\\t";
+    } else {
+      result += char;
+    }
+  }
+
+  return result;
+}
+
 export function parseEnrichmentResponse(text: string): EnrichmentResult {
-  const jsonBlock = extractJsonBlock(text);
+  const jsonBlock = sanitizeControlCharsInStrings(extractJsonBlock(text));
 
   let parsed: unknown;
   try {
