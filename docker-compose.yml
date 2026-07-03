@@ -33,6 +33,12 @@ services:
       # host se controla con SCAN_TARGET_HOST_PATH en .env, ver volumes abajo.
       # POST /api/scan usa esto solo si el body no manda { path }.
       SCAN_TARGET_PATH: /app/scan-target
+      # Motor de Razonamiento (reasoning/client.ts, T2.1-T2.3). Sin esto
+      # configurado en tu .env, cada finding queda con reasoningStatus:
+      # "error" (fallback) en vez de la explicación/remediación de Claude —
+      # el scan igual funciona, solo que sin enriquecer.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
