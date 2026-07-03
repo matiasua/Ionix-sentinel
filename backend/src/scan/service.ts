@@ -33,6 +33,14 @@ interface InsertableFinding {
   explanation: string;
   remediation: string;
   category: Category;
+  // "ok" | "error": si viene de "live-scan", refleja el resultado REAL de
+  // enrichFinding() para ese hallazgo puntual (puede fallar uno y no otros,
+  // ver reasoning/client.ts). Si viene de una rama seed, no hubo ninguna
+  // llamada a Claude — se guarda "ok" porque no es una falla, pero el
+  // origen real (seed vs. Claude en vivo) hay que leerlo de la columna
+  // `branch`, no de reasoning_status (branch === "live-scan" = pasó por
+  // Claude de verdad; cualquier otro valor = texto precrito en seeds.ts).
+  reasoningStatus: "ok" | "error";
 }
 
 const RULES_PATH = path.join(__dirname, "../rules/pci-rules.yaml");
@@ -108,6 +116,7 @@ async function runLiveScan(): Promise<InsertableFinding[]> {
     explanation: finding.explanation,
     remediation: finding.remediation,
     category: RULE_CATEGORY[finding.ruleId] ?? "pci_compliance",
+    reasoningStatus: finding.reasoningStatus,
   }));
 }
 
@@ -148,6 +157,10 @@ function seedFindingsFor(branch: BranchKey): InsertableFinding[] {
     explanation: s.explanation,
     remediation: s.remediation,
     category: s.category,
+    // No hay llamada a Claude en el camino de seeds — "ok" acá no significa
+    // "Claude lo confirmó", significa "no hubo ningún error de razonamiento
+    // porque no se intentó razonar". Ver nota en InsertableFinding.
+    reasoningStatus: "ok",
   }));
 }
 
@@ -175,8 +188,8 @@ export async function runScan(branch: BranchKey): Promise<ScanResult> {
       await client.query(
         `INSERT INTO findings
            (rule_id, pci_requirement, title, severity, source, file_path, line_number,
-            snippet, explanation, remediation, status, scan_id, category, branch)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+            snippet, explanation, remediation, status, scan_id, category, branch, reasoning_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [
           f.ruleId,
           f.pciRequirement,
@@ -192,6 +205,7 @@ export async function runScan(branch: BranchKey): Promise<ScanResult> {
           scanId,
           f.category,
           branch,
+          f.reasoningStatus,
         ]
       );
     }
