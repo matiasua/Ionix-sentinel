@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { LiveLogPayload, Finding, Status } from "./api/client";
-import { getFindings, getLogs, triggerScan, updateFindingStatus } from "./api/client";
+import { getFindings, getLiveScanBranches, getLogs, triggerScan, updateFindingStatus } from "./api/client";
 import { Sidebar, type Section } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { Toast } from "./components/ui/Toast";
@@ -57,6 +57,14 @@ export default function App() {
   const [repo, setRepo] = useState(repos[0].value);
   const [ruleEnabled, setRuleEnabled] = useState<Record<string, boolean>>({});
 
+  // Ramas GIT REALES de matiasua/Ionix-sentinel para el modo "live-scan"
+  // (distinto de `repo`, que son las ramas-etiqueta del selector de seeds).
+  // Se cargan sólo la primera vez que se entra a "live-scan", no en cada render.
+  const [gitBranches, setGitBranches] = useState<string[] | null>(null);
+  const [gitBranch, setGitBranch] = useState<string | undefined>(undefined);
+  const [gitBranchesLoading, setGitBranchesLoading] = useState(false);
+  const [gitBranchesError, setGitBranchesError] = useState(false);
+
   useEffect(() => {
     const onResize = () => setNarrow(window.innerWidth < 1080);
     window.addEventListener("resize", onResize);
@@ -75,6 +83,19 @@ export default function App() {
     getFindings()
       .then(setFindings)
       .catch(() => setLoadError(true));
+  }
+
+  function loadGitBranchesIfNeeded() {
+    if (gitBranches !== null || gitBranchesLoading) return;
+    setGitBranchesLoading(true);
+    setGitBranchesError(false);
+    getLiveScanBranches()
+      .then((branches) => {
+        setGitBranches(branches);
+        setGitBranch((prev) => prev ?? branches[0]);
+      })
+      .catch(() => setGitBranchesError(true))
+      .finally(() => setGitBranchesLoading(false));
   }
 
   function showToast(msg: string) {
@@ -118,7 +139,7 @@ export default function App() {
     });
 
     try {
-      const result = await triggerScan(repo);
+      const result = await triggerScan(repo, repo === "live-scan" ? gitBranch : undefined);
       const fresh = await getFindings();
       setFindings(fresh);
       showToast(
@@ -370,8 +391,15 @@ export default function App() {
               setRepo(value as typeof repo);
               const r = repos.find((x) => x.value === value);
               showToast(`Rama seleccionada → ${r?.branch ?? value} · presiona Escanear repo para analizar`);
+              if (value === "live-scan") loadGitBranchesIfNeeded();
             }}
             lastScanLabel={lastScanLabel}
+            showGitBranchSelector={repo === "live-scan"}
+            gitBranches={gitBranches}
+            gitBranch={gitBranch}
+            onGitBranchChange={setGitBranch}
+            gitBranchesLoading={gitBranchesLoading}
+            gitBranchesError={gitBranchesError}
           />
         )}
 

@@ -9,6 +9,7 @@ import { loadRules } from "../rules/loader";
 import { runAnalysis } from "../analysis/runner";
 import { mapMatchesToFindings } from "../analysis/mapper";
 import { enrichFinding } from "../reasoning/client";
+import { resolveScanTarget } from "./gitRepo";
 import type { Rule } from "../types/rule";
 
 export interface ScanResult {
@@ -80,15 +81,31 @@ const RULE_CATEGORY: Record<string, Category> = {
 // Claude, la ruta configurada), el resto del selector de ramas (seeds) sigue
 // funcionando sin depender de infraestructura externa — por eso vive aparte
 // y no reemplaza el modo seed.
-async function runLiveScan(): Promise<InsertableFinding[]> {
-  if (!env.scanTargetPath) {
-    throw new Error(
-      "SCAN_TARGET_PATH no está configurada — no hay qué escanear para la rama live-scan."
-    );
+const DEFAULT_LIVE_SCAN_GIT_BRANCH = "pci-vulnerable-demo";
+
+// Resuelve qué carpeta escanear en "live-scan", en orden de preferencia:
+// 1. `gitBranch` explícito (rama real de matiasua/Ionix-sentinel, elegida en
+//    el dropdown del frontend) — se clona/actualiza sola, sin depender de
+//    ningún volumen de Docker configurado a mano.
+// 2. `env.scanTargetPath` (SCAN_TARGET_PATH) — mecanismo legado por si
+//    alguien prefiere seguir usando una carpeta local montada como volumen.
+// 3. Si no hay ninguno de los dos, clona la rama pci-vulnerable-demo por
+//    default (mismo comportamiento que antes de este feature).
+async function resolveLiveScanPath(gitBranch: string | undefined): Promise<string> {
+  if (gitBranch) {
+    return resolveScanTarget(gitBranch);
   }
+  if (env.scanTargetPath) {
+    return env.scanTargetPath;
+  }
+  return resolveScanTarget(DEFAULT_LIVE_SCAN_GIT_BRANCH);
+}
+
+async function runLiveScan(gitBranch?: string): Promise<InsertableFinding[]> {
+  const targetPath = await resolveLiveScanPath(gitBranch);
 
   const rules = getRules();
-  const matches = runAnalysis(env.scanTargetPath, rules);
+  const matches = runAnalysis(targetPath, rules);
   const rawFindings = mapMatchesToFindings(matches, rules);
 
   // enrichFinding() nunca lanza (ver reasoning/client.ts): si Claude falla
@@ -174,8 +191,8 @@ function seedFindingsFor(branch: BranchKey): InsertableFinding[] {
 // consistente con el Dashboard estático (para "live-scan" el log queda solo
 // con las líneas benignas — no hay una manifestación de log seedeada para
 // hallazgos que no se conocen de antemano).
-export async function runScan(branch: BranchKey): Promise<ScanResult> {
-  const findings = branch === "live-scan" ? await runLiveScan() : seedFindingsFor(branch);
+export async function runScan(branch: BranchKey, gitBranch?: string): Promise<ScanResult> {
+  const findings = branch === "live-scan" ? await runLiveScan(gitBranch) : seedFindingsFor(branch);
   const scanId = `scan_${branch}_${Date.now()}`;
 
   const client = await pool.connect();

@@ -121,14 +121,27 @@ export async function updateFindingStatus(id: string, status: Status): Promise<F
   return res.json();
 }
 
-export async function triggerScan(branch: string): Promise<ScanSummary> {
+// `gitBranch` solo aplica cuando branch === "live-scan": es el nombre de una
+// rama GIT REAL de matiasua/Ionix-sentinel (no una de las ramas-etiqueta del
+// selector de arriba) que el backend clona/actualiza sola antes de escanear.
+// Para el resto de las ramas (seeds) se omite y el backend usa su catálogo fijo.
+export async function triggerScan(branch: string, gitBranch?: string): Promise<ScanSummary> {
   const res = await fetch(`${API_URL}/api/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ branch }),
+    body: JSON.stringify(gitBranch ? { branch, gitBranch } : { branch }),
   });
   if (!res.ok) throw new Error("Failed to trigger scan");
   return res.json();
+}
+
+// Ramas reales del repo matiasua/Ionix-sentinel, para poblar el selector
+// secundario que aparece cuando se elige "live-scan (análisis real)".
+export async function getLiveScanBranches(): Promise<string[]> {
+  const res = await fetch(`${API_URL}/api/live-scan/branches`);
+  if (!res.ok) throw new Error("Failed to fetch live-scan branches");
+  const data = await res.json();
+  return data.branches;
 }
 
 export async function getLogs(): Promise<LiveLogPayload> {

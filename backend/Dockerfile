@@ -1,5 +1,10 @@
 FROM node:20-alpine
 
+# git: usado por scan/gitRepo.ts para listar/clonar ramas reales del repo en
+# la rama "live-scan" (git ls-remote + clone --depth 1), no viene en la
+# imagen base de Alpine.
+RUN apk add --no-cache git
+
 WORKDIR /app
 
 COPY package.json ./
