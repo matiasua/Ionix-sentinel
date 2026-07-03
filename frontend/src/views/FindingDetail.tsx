@@ -60,7 +60,7 @@ export function FindingDetail({
       <div className="claude-grid">
         <div className="claude-card">
           <div className="claude-card__head">
-            <h3>Por qué es una violación</h3>
+            <h3>Por qué es una vulnerabilidad</h3>
             <span className="claude-tag">✦ GENERADO POR CLAUDE</span>
           </div>
           <p>{finding.explanation}</p>

@@ -48,7 +48,7 @@ export function DashboardResumen({
       {isEmpty ? (
         <EmptyState
           title="Aún no hay hallazgos"
-          description="Ejecuta el primer escaneo del repositorio para detectar violaciones PCI-DSS."
+          description="Ejecuta el primer escaneo del repositorio para detectar vulnerabilidades PCI-DSS."
           ctaLabel="Escanear repo"
           onCta={onScan}
         />
