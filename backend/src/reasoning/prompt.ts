@@ -46,3 +46,54 @@ Reglas para tu respuesta:
 - "explanation" y "remediation" van en español, dirigidos a un desarrollador que va a leer esto en un dashboard.
 - No repitas el snippet completo dentro de "explanation" ni "remediation".`;
 }
+
+// T-SOLVE (botón "Generar solución" en el detalle de un hallazgo) — a
+// diferencia de buildEnrichmentPrompt (que pide una descripción en texto de
+// cómo corregir), este prompt le pide a Claude el CÓDIGO corregido en sí,
+// actuando como un ingeniero de software senior que ya tiene el diagnóstico
+// resuelto (la explicación de por qué es una violación, generada antes por
+// el propio Motor de Razonamiento) y solo necesita escribir el fix.
+export type SolutionPromptFinding = Pick<
+  CreateFindingInput,
+  "ruleId" | "pciRequirement" | "title" | "severity" | "filePath" | "lineNumber" | "snippet"
+> & {
+  // Explicación ya generada (finding.explanation) — el "Por qué es una
+  // violación" que ya ve el usuario en el detalle. Se la pasamos a Claude
+  // para que no tenga que re-derivarla y pueda enfocarse en el fix.
+  explanation: string;
+};
+
+export function buildSolutionPrompt(finding: SolutionPromptFinding): string {
+  return `Sos un ingeniero de software senior especialista en seguridad de aplicaciones de pagos y en PCI-DSS v4, trabajando dentro de IONIX Sentinel.
+
+Un motor de reglas determinístico ya detectó una violación real de PCI-DSS en el siguiente código, y el Motor de Razonamiento ya generó el diagnóstico de por qué es una violación (abajo). Esas dos decisiones ya están tomadas — no las cuestiones ni las repitas. Tu única tarea es escribir el CÓDIGO corregido, como lo harías en un pull request real.
+
+Hallazgo:
+- ID de regla: ${finding.ruleId}
+- Requisito PCI-DSS v4: ${finding.pciRequirement}
+- Título: ${finding.title}
+- Severidad: ${finding.severity}
+- Archivo: ${finding.filePath}${finding.lineNumber != null ? `:${finding.lineNumber}` : ""}
+
+Por qué es una violación (ya generado, tomalo como diagnóstico dado):
+${finding.explanation}
+
+Código con la vulnerabilidad:
+\`\`\`
+${finding.snippet}
+\`\`\`
+
+Generá una respuesta que contenga EXCLUSIVAMENTE un bloque JSON (podés incluir texto antes o después si querés, pero el JSON tiene que estar completo y ser válido) con esta forma exacta:
+
+{
+  "codeBefore": "<el fragmento de código original relevante — puede ser el mismo snippet o solo la porción exacta que cambia>",
+  "codeAfter": "<el código YA CORREGIDO, listo para reemplazar codeBefore — código real y funcional en el mismo lenguaje/framework del snippet, no pseudocódigo>",
+  "explanation": "<1-3 oraciones en español explicando POR QUÉ este cambio puntual resuelve la violación — no repitas el diagnóstico de arriba, enfocate en el fix>"
+}
+
+Reglas para tu respuesta:
+- "codeAfter" tiene que ser código real que compile/corra en el mismo lenguaje y con las mismas convenciones del snippet original (mismo estilo de imports, nombres de variables existentes, etc.) — no inventes funciones o librerías que no existan en un proyecto Node/TypeScript/SQL típico salvo que sea evidente que ya se usan.
+- Si el fix requiere una migración de base de datos (ALTER TABLE, etc.) o un paso fuera del snippet (ej. usar un KMS, rotar una clave), mencionalo brevemente en "explanation", pero "codeAfter" debe mostrar igual el cambio de código que sí es posible mostrar en el snippet.
+- No agregues comentarios explicando línea por línea dentro de "codeAfter" — el código debe quedar limpio, como si ya estuviera mergeado.
+- "explanation" va en español, dirigida a un desarrollador que ya leyó el diagnóstico y solo quiere entender el fix.`;
+}

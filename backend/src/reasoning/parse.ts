@@ -67,7 +67,9 @@ export function extractJsonBlock(text: string): string {
 // un string?" que extractJsonBlock, y escapa esos caracteres de control
 // SOLO cuando aparecen dentro de un string — nunca toca el whitespace fuera
 // de comillas, que es válido y no hace falta tocar.
-function sanitizeControlCharsInStrings(jsonBlock: string): string {
+// Exportada porque parseSolutionResponse (código corregido, con multilínea
+// real dentro de codeBefore/codeAfter) la necesita también.
+export function sanitizeControlCharsInStrings(jsonBlock: string): string {
   let result = "";
   let inString = false;
   let escapeNext = false;
@@ -143,5 +145,51 @@ function validateEnrichmentSchema(value: unknown): EnrichmentResult {
     severity: severity as Severity,
     explanation: (candidate.explanation as string).trim(),
     remediation: (candidate.remediation as string).trim(),
+  };
+}
+
+// T-SOLVE — misma filosofía defensiva que parseEnrichmentResponse: nunca
+// asume que el string completo es JSON, sanea saltos de línea literales
+// dentro de strings, y valida que los 3 campos vengan no-vacíos antes de
+// darle la respuesta por buena.
+export interface SolutionResult {
+  codeBefore: string;
+  codeAfter: string;
+  explanation: string;
+}
+
+export function parseSolutionResponse(text: string): SolutionResult {
+  const jsonBlock = sanitizeControlCharsInStrings(extractJsonBlock(text));
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonBlock);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`El bloque JSON extraído de la respuesta de Claude no es JSON válido: ${reason}`);
+  }
+
+  return validateSolutionSchema(parsed);
+}
+
+function validateSolutionSchema(value: unknown): SolutionResult {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("La respuesta de Claude no es un objeto JSON");
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const missing = ["codeBefore", "codeAfter", "explanation"].filter(
+    (key) => typeof candidate[key] !== "string" || (candidate[key] as string).trim() === ""
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `La respuesta de Claude no tiene los campos requeridos (o vienen vacíos): ${missing.join(", ")}`
+    );
+  }
+
+  return {
+    codeBefore: (candidate.codeBefore as string).trim(),
+    codeAfter: (candidate.codeAfter as string).trim(),
+    explanation: (candidate.explanation as string).trim(),
   };
 }

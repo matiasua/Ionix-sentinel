@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../db/pool";
 import { CreateFindingInput, Finding, Severity, Source, Status } from "../types/finding";
 import { SEVERITY_ORDER_SQL } from "../lib/severity";
+import { generateCodeSolution } from "../reasoning/client";
 
 export const findingsRouter = Router();
 
@@ -27,6 +28,16 @@ function mapRowToFinding(row: any): Finding {
     reasoningStatus: row.reasoning_status,
     category: row.category ?? null,
     branch: row.branch ?? null,
+    codeSolution:
+      row.code_solution_before != null
+        ? {
+            codeBefore: row.code_solution_before,
+            codeAfter: row.code_solution_after,
+            explanation: row.code_solution_explanation,
+            generatedAt: row.code_solution_generated_at,
+          }
+        : null,
+    codeSolutionStatus: row.code_solution_status ?? null,
     createdAt: row.created_at,
   };
 }
@@ -75,6 +86,7 @@ findingsRouter.get("/api/findings", async (req, res) => {
     );
     res.json(result.rows.map(mapRowToFinding));
   } catch (error) {
+    console.error("[findings] GET /api/findings falló:", error);
     res.status(500).json({ error: "Failed to fetch findings" });
   }
 });
@@ -89,6 +101,7 @@ findingsRouter.get("/api/findings/:id", async (req, res) => {
     }
     res.json(mapRowToFinding(result.rows[0]));
   } catch (error) {
+    console.error("[findings] GET /api/findings/:id falló:", error);
     res.status(500).json({ error: "Failed to fetch finding" });
   }
 });
@@ -121,6 +134,7 @@ findingsRouter.post("/api/findings", async (req, res) => {
     );
     res.status(201).json(mapRowToFinding(result.rows[0]));
   } catch (error) {
+    console.error("[findings] POST /api/findings falló:", error);
     res.status(500).json({ error: "Failed to create finding" });
   }
 });
@@ -142,6 +156,43 @@ findingsRouter.patch("/api/findings/:id", async (req, res) => {
     }
     res.json(mapRowToFinding(result.rows[0]));
   } catch (error) {
+    console.error("[findings] PATCH /api/findings/:id falló:", error);
     res.status(500).json({ error: "Failed to update finding" });
+  }
+});
+
+// "Generar solución" (botón en el detalle de un hallazgo, ver
+// frontend/src/views/FindingDetail.tsx): a diferencia de explanation/
+// remediation (generados en bulk durante el scan), esto corre on-demand,
+// una vez por click, y persiste el resultado para no volver a gastar
+// tokens si el usuario vuelve a este hallazgo. Solo aplica a findings de
+// código (los de logs no tienen fila en esta tabla — ver App.tsx del
+// frontend, "no persisten en DB").
+findingsRouter.post("/api/findings/:id/solve", async (req, res) => {
+  try {
+    const current = await pool.query("SELECT * FROM findings WHERE id = $1", [req.params.id]);
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: "Finding not found" });
+    }
+
+    const finding = mapRowToFinding(current.rows[0]);
+    const solution = await generateCodeSolution(finding);
+
+    const updated = await pool.query(
+      `UPDATE findings
+         SET code_solution_before = $1,
+             code_solution_after = $2,
+             code_solution_explanation = $3,
+             code_solution_status = $4,
+             code_solution_generated_at = now()
+       WHERE id = $5
+       RETURNING *`,
+      [solution.codeBefore, solution.codeAfter, solution.explanation, solution.codeSolutionStatus, req.params.id]
+    );
+
+    res.json(mapRowToFinding(updated.rows[0]));
+  } catch (error) {
+    console.error("[findings] POST /api/findings/:id/solve falló:", error);
+    res.status(500).json({ error: "Failed to generate code solution" });
   }
 });

@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import type { LiveLogPayload, Finding, Status } from "./api/client";
-import { getFindings, getLiveScanBranches, getLogs, triggerScan, updateFindingStatus } from "./api/client";
+import {
+  generateCodeSolution,
+  generateLogCodeSolution,
+  getFindings,
+  getLiveScanBranches,
+  getLogs,
+  triggerScan,
+  updateFindingStatus,
+} from "./api/client";
 import { Sidebar, type Section } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { Toast } from "./components/ui/Toast";
@@ -49,6 +57,10 @@ export default function App() {
 
   const [scanning, setScanning] = useState(false);
   const [scanPct, setScanPct] = useState(0);
+
+  // Id del finding para el que se está generando la solución de código
+  // on-demand (botón "Generar solución" en el detalle). null = ninguno.
+  const [solvingId, setSolvingId] = useState<string | null>(null);
 
   const [fSev, setFSev] = useState<Severity | "all">("all");
   const [fReq, setFReq] = useState<string>("all");
@@ -184,6 +196,47 @@ export default function App() {
       });
   }
 
+  // Botón "Generar solución" en el detalle — findings de código (con fila
+  // en `findings`). Persiste en el backend, así que actualizamos con la
+  // respuesta completa del server en vez de mergear un parche local.
+  function generateSolution(id: string) {
+    if (solvingId) return;
+    setSolvingId(id);
+    generateCodeSolution(id)
+      .then((updated) => {
+        setFindings((prev) => (prev ? prev.map((f) => (f.id === id ? updated : f)) : prev));
+        if (updated.codeSolutionStatus === "error") {
+          showToast("Claude no pudo generar la solución — intenta de nuevo");
+        } else {
+          showToast("Solución generada");
+        }
+      })
+      .catch(() => showToast("No se pudo generar la solución"))
+      .finally(() => setSolvingId(null));
+  }
+
+  // Misma idea para findings de logs — no tienen fila en `findings`, así
+  // que no hay nada que persistir en el backend: el resultado se mergea
+  // solo en logData (estado local), igual que ya hace changeStatus(..., true).
+  function generateLogSolution(id: string) {
+    if (solvingId || !logData) return;
+    const finding = logData.findings.find((f) => f.id === id);
+    if (!finding) return;
+
+    setSolvingId(id);
+    generateLogCodeSolution(finding)
+      .then(({ codeSolution, codeSolutionStatus }) => {
+        setLogData((prev) =>
+          prev
+            ? { ...prev, findings: prev.findings.map((f) => (f.id === id ? { ...f, codeSolution, codeSolutionStatus } : f)) }
+            : prev
+        );
+        showToast(codeSolutionStatus === "error" ? "Claude no pudo generar la solución — intenta de nuevo" : "Solución generada");
+      })
+      .catch(() => showToast("No se pudo generar la solución"))
+      .finally(() => setSolvingId(null));
+  }
+
   function toggleRule(ruleId: string) {
     setRuleEnabled((prev) => {
       const on = prev[ruleId] !== false;
@@ -269,6 +322,8 @@ export default function App() {
                 backLabel="← Volver a hallazgos"
                 onBack={() => setView("findings")}
                 onStatusChange={(status) => changeStatus(finding.id, status, false)}
+                onGenerateSolution={() => generateSolution(finding.id)}
+                solvingSolution={solvingId === finding.id}
               />
             );
           })()}
@@ -346,6 +401,8 @@ export default function App() {
             setSelectedComponentId(componentId);
             setLogView("componentDetail");
           }}
+          onGenerateSolution={() => generateLogSolution(finding.id)}
+          solvingSolution={solvingId === finding.id}
         />
       );
     }

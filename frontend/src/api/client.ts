@@ -4,6 +4,18 @@ export type Severity = "low" | "medium" | "high" | "critical";
 export type Source = "code" | "log";
 export type Status = "open" | "acknowledged" | "resolved" | "false_positive";
 
+export type CodeSolutionStatus = "ok" | "error";
+
+// Solución de código generada on-demand (botón "Generar solución" en el
+// detalle) — distinta de `remediation` (texto generado en bulk durante el
+// scan). Acá Claude devuelve el código corregido en sí, no una descripción.
+export interface CodeSolution {
+  codeBefore: string;
+  codeAfter: string;
+  explanation: string;
+  generatedAt: string;
+}
+
 export interface Finding {
   id: string;
   ruleId: string;
@@ -18,6 +30,10 @@ export interface Finding {
   remediation: string;
   status: Status;
   scanId: string | null;
+  // Opcionales: los findings reales (backend) siempre las traen; los mocks
+  // de desarrollo (mocks/findings.ts, mocks/logs.ts) no las necesitan.
+  codeSolution?: CodeSolution | null;
+  codeSolutionStatus?: CodeSolutionStatus | null;
   createdAt: string;
 }
 
@@ -153,5 +169,32 @@ export async function getLogs(): Promise<LiveLogPayload> {
 export async function getLatestScan(): Promise<ScanSummary> {
   const res = await fetch(`${API_URL}/api/scans/latest`);
   if (!res.ok) throw new Error("Failed to fetch latest scan");
+  return res.json();
+}
+
+// Botón "Generar solución" en el detalle de un hallazgo (solo aplica a
+// findings de código — los de logs no tienen fila en `findings`, ver
+// App.tsx). Genera y persiste la solución en el backend; devuelve el
+// finding actualizado completo.
+export async function generateCodeSolution(id: string): Promise<Finding> {
+  const res = await fetch(`${API_URL}/api/findings/${id}/solve`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to generate code solution");
+  return res.json();
+}
+
+// Misma idea para findings de logs, que no tienen fila en `findings` (se
+// generan al vuelo en GET /api/logs) — mandamos los datos del finding en el
+// body en vez de un id, y el backend no persiste nada. El frontend mergea
+// el resultado en su estado local de logs (App.tsx), igual que ya hace con
+// el cambio de status para findings de logs.
+export async function generateLogCodeSolution(
+  finding: Pick<Finding, "ruleId" | "pciRequirement" | "title" | "severity" | "filePath" | "lineNumber" | "snippet" | "explanation">
+): Promise<{ codeSolution: CodeSolution; codeSolutionStatus: CodeSolutionStatus }> {
+  const res = await fetch(`${API_URL}/api/logs/solve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(finding),
+  });
+  if (!res.ok) throw new Error("Failed to generate code solution");
   return res.json();
 }

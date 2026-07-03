@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS findings (
   category TEXT,
   branch TEXT,
 
+  -- Solución de código on-demand (botón "Generar solución" en el detalle).
+  -- A diferencia de explanation/remediation (generados en bulk durante el
+  -- scan), esto se genera solo cuando el usuario lo pide y se persiste acá
+  -- para no volver a llamar a Claude si vuelve a esta vista.
+  code_solution_before TEXT,
+  code_solution_after TEXT,
+  code_solution_explanation TEXT,
+  code_solution_status TEXT CHECK (code_solution_status IS NULL OR code_solution_status IN ('ok', 'error')),
+  code_solution_generated_at TIMESTAMPTZ,
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
