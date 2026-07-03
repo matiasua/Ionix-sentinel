@@ -45,7 +45,7 @@ export function Sidebar({
           <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
             <path d="M3 4.2H15 M3 9H15 M3 13.8H10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          Dashboard logs
+          Dashboard dinámico
         </button>
 
         <span className="nav-section-label" style={{ paddingTop: 14 }}>
