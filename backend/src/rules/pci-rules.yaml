@@ -1,0 +1,106 @@
+# Motor de reglas PCI-DSS v4 — IONIX Sentinel (T1.2, HU-B1.2)
+#
+# Fuente única de verdad de qué es una violación PCI-DSS (regla dura del proyecto:
+# el motor de reglas decide, Claude solo enriquece). backend/src/rules/loader.ts
+# valida este archivo al arrancar; backend/src/analysis/runner.ts lo usa para
+# saber qué patrones aplicar sobre cada archivo escaneado.
+#
+# Campos de cada regla:
+#   id             identificador único, prefijo PCI-
+#   pciRequirement requisito PCI-DSS v4 asociado (ej. "8.6.2")
+#   title          mensaje visible al usuario, en español
+#   severity       severidad base (Claude puede confirmarla/ajustarla al enriquecer)
+#   detector       "regex" (hoy) — semgrep queda para una iteración futura, ver nota abajo
+#   pattern        expresión regular a evaluar sobre el contenido del archivo
+#   flags          flags de regex (opcional). "i" = case-insensitive
+#   luhn           opcional. Si es true, cada coincidencia numérica del match debe
+#                  pasar el algoritmo de Luhn (analysis/luhn.ts) antes de emitirse
+#                  como finding — evita falsos positivos masivos de "posible PAN"
+#                  (ver HU-B1.3 y el gotcha correspondiente en CLAUDE.md).
+#
+# Nota sobre "detector": para el hackathon de hoy, las 7 reglas usan regex en vez
+# de patrones semgrep. Es una decisión deliberada: escribir patrones semgrep
+# correctos (sintaxis de metavariables $VAR, etc.) tiene más riesgo de consumir
+# tiempo de debugging del que tenemos, mientras que regex sobre un repo TS/TSX
+# conocido es rápido de escribir y de verificar. Los 7 patrones de abajo fueron
+# probados contra pci-dss-vulnerable-demo (rama pci-vulnerable-demo) línea por
+# línea antes de este commit — ver resultado en el PR.
+#
+# Cobertura de hoy (6 reglas "core" + 1 regla que ejercita Luhn):
+# Quedan fuera a propósito (ver docs/wbs.md, "Corte de alcance"): VULN-002 (vive
+# en un .sql, el analizador es de un solo lenguaje), VULN-006/VULN-010 (control
+# de acceso / masking, no detectables con patrones simples), VULN-007/VULN-012
+# (quedaron como P1 para si sobra tiempo).
+
+- id: PCI-SECRET-HARDCODED
+  pciRequirement: "8.6.2"
+  title: "Credencial o API key hardcodeada en el código fuente"
+  severity: high
+  detector: regex
+  pattern: '\w*(password|secret|token|api[_-]?key)\w*\s*[:=]\s*["''][^"'']{6,}["'']'
+  flags: "i"
+  # Cubre: VULN-001 (password de Postgres en lib/db.ts), VULN-005 (JWT_SECRET en
+  # lib/auth.ts), VULN-009 (STRIPE_SECRET_KEY en pages/api/webhooks/stripe.ts).
+
+- id: PCI-PAN-CVV-LOGGED
+  pciRequirement: "3.4.1"
+  title: "PAN o CVV impresos en logs de aplicación"
+  severity: critical
+  detector: regex
+  pattern: 'console\.(log|error|warn)\([^;]*?(\b(pan|cvv)\b|JSON\.stringify\()'
+  flags: "i"
+  # Cubre: VULN-003a (charge.ts), VULN-008b (CheckoutForm.tsx, consola del
+  # navegador), VULN-016 (refund.ts), VULN-017 (mapper.ts, logueo del registro
+  # completo del cardholder vía JSON.stringify).
+
+- id: PCI-SQL-INJECTION
+  pciRequirement: "6.2.4"
+  title: "Posible inyección SQL por interpolación en un template string"
+  severity: high
+  detector: regex
+  pattern: '`[^`]*\b(SELECT|INSERT|UPDATE|DELETE)\b[^`]*\$\{[^`]*`'
+  flags: "i"
+  # Cubre: VULN-003b (pages/api/payments/charge.ts) — el INSERT armado con
+  # template string interpolado en vez de parámetros preparados.
+
+- id: PCI-WEAK-CRYPTO
+  pciRequirement: "3.6.1"
+  title: "Cifrado débil (modo ECB) usado para proteger datos de tarjeta"
+  severity: high
+  detector: regex
+  pattern: 'createCipheriv\(\s*["''][a-z0-9-]*ecb["'']'
+  flags: "i"
+  # Cubre: VULN-004 (lib/crypto.ts, aes-128-ecb). No debe matchear
+  # encryptPanStrong (AES-256-GCM) — control negativo TRAP-T3, verificado.
+
+- id: PCI-INSECURE-STORAGE-CLIENT
+  pciRequirement: "3.3"
+  title: "PAN o CVV almacenados en localStorage del navegador"
+  severity: high
+  detector: regex
+  pattern: 'localStorage\.setItem\([^)]*\b(pan|cvv|card)\b'
+  flags: "i"
+  # Cubre: VULN-008a (components/CheckoutForm.tsx).
+
+- id: PCI-NO-TLS
+  pciRequirement: "4.2.1"
+  title: "Conexión configurada explícitamente sin TLS"
+  severity: medium
+  detector: regex
+  pattern: 'ssl\s*:\s*false'
+  flags: "i"
+  # Cubre: VULN-011 (lib/db.ts).
+
+- id: PCI-PAN-LITERAL
+  pciRequirement: "3.5.1"
+  title: "Posible número de tarjeta (PAN) en texto plano en el código fuente"
+  severity: critical
+  detector: regex
+  pattern: '\b\d{13,19}\b'
+  luhn: true
+  # Única regla que ejercita la validación de Luhn (HU-B1.3). En
+  # pci-dss-vulnerable-demo hoy no debería emitir NINGÚN finding: los 3
+  # números de lib/testCards.ts (TRAP-T1) fallan Luhn a propósito, y el
+  # comentario de ejemplo en refund.ts también se ajustó para fallar Luhn.
+  # Esto es intencional — demuestra que el filtro de falsos positivos
+  # funciona, no que la regla esté "vacía" o rota.

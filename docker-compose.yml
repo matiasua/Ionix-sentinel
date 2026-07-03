@@ -29,6 +29,16 @@ services:
     environment:
       PORT: ${BACKEND_PORT:-3000}
       DATABASE_URL: ${DATABASE_URL:-postgresql://sentinel_user:sentinel_password@postgres:5432/ionix_sentinel}
+      # Ruta FIJA dentro del contenedor (no la del host) — el path real del
+      # host se controla con SCAN_TARGET_HOST_PATH en .env, ver volumes abajo.
+      # Solo la usa la rama "live-scan" del selector de ramas.
+      SCAN_TARGET_PATH: /app/scan-target
+      # Motor de Razonamiento (reasoning/client.ts, T2.1-T2.3), usado por la
+      # rama "live-scan". Sin esto en tu .env, esos findings quedan con
+      # reasoningStatus: "error" (fallback) en vez de la explicación de
+      # Claude — el resto de las ramas (seeds) no depende de esto.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
@@ -36,6 +46,13 @@ services:
       - ./backend/package.json:/app/package.json
       - ./backend/tsconfig.json:/app/tsconfig.json
       - backend_node_modules:/app/node_modules
+      # Checkout local de pci-dss-vulnerable-demo (rama pci-vulnerable-demo),
+      # montado de solo lectura para que la rama "live-scan" pueda leerlo
+      # desde dentro del contenedor. Cada quien configura dónde lo tiene en
+      # su máquina vía SCAN_TARGET_HOST_PATH en su .env — el default asume
+      # que vive como carpeta hermana de este repo (ver HU-B1.1 en
+      # docs/epicas-historias.md).
+      - ${SCAN_TARGET_HOST_PATH:-../pci-dss-vulnerable-demo}:/app/scan-target:ro
     depends_on:
       postgres:
         condition: service_healthy
