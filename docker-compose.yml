@@ -39,6 +39,9 @@ services:
       # Claude — el resto de las ramas (seeds) no depende de esto.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      # Directorio (compartido con log-simulator) donde el sistema productivo
+      # simulado escribe sus .log; el Dashboard de Logs los lee de aquí.
+      SIM_LOG_DIR: /var/log/sim
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
@@ -46,6 +49,9 @@ services:
       - ./backend/package.json:/app/package.json
       - ./backend/tsconfig.json:/app/tsconfig.json
       - backend_node_modules:/app/node_modules
+      # Logs del sistema productivo simulado, montados de solo lectura: el
+      # backend los analiza para el Dashboard de Logs (los escribe log-simulator).
+      - sim_logs:/var/log/sim:ro
       # Checkout local de pci-dss-vulnerable-demo (rama pci-vulnerable-demo),
       # montado de solo lectura para que la rama "live-scan" pueda leerlo
       # desde dentro del contenedor. Cada quien configura dónde lo tiene en
@@ -81,6 +87,27 @@ services:
     networks:
       - ionix-network
 
+  # Sistema productivo simulado ("payments-runtime"): 4 componentes, UI con 2
+  # botones que generan trazas de error (pila de ejecución + correlationId) a
+  # sim_logs. El Dashboard de Logs las analiza. Es la contraparte de ejecución
+  # del Dashboard Estático (que escanea código).
+  log-simulator:
+    build:
+      context: ./log-simulator
+      dockerfile: Dockerfile
+    container_name: ionix-sentinel-log-simulator
+    restart: unless-stopped
+    environment:
+      PORT: 4100
+      SIM_LOG_DIR: /var/log/sim
+    ports:
+      - "${SIMULATOR_PORT:-4100}:4100"
+    volumes:
+      - ./log-simulator/server.js:/app/server.js
+      - sim_logs:/var/log/sim
+    networks:
+      - ionix-network
+
 networks:
   ionix-network:
     driver: bridge
@@ -90,3 +117,4 @@ volumes:
     name: ionix_postgres_data
   backend_node_modules:
   frontend_node_modules:
+  sim_logs:

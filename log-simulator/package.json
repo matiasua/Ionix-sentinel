@@ -1,0 +1,9 @@
+{
+  "name": "log-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema productivo simulado (payments-runtime) que genera trazas de error a .log para el Dashboard de Logs de IONIX Sentinel.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

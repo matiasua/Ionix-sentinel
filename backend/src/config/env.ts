@@ -15,4 +15,9 @@ export const env = {
   // configura aparte con SCAN_TARGET_HOST_PATH en tu .env, que es lo que se
   // monta como volumen de solo lectura dentro del contenedor.
   scanTargetPath: process.env.SCAN_TARGET_PATH ?? null,
+
+  // Directorio (volumen compartido con el servicio log-simulator) donde el
+  // sistema productivo simulado escribe sus .log. El Dashboard de Logs los lee
+  // desde aquí. Ver docker-compose.yml (volumen sim_logs).
+  simLogDir: process.env.SIM_LOG_DIR ?? "/var/log/sim",
 };
